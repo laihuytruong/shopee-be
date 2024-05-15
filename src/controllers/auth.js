@@ -6,6 +6,8 @@ const {
     generateAccessToken,
     generateRefreshToken,
 } = require('../utils/helpers')
+const sendEmail = require('../utils/sendEmail')
+const crypto = require('crypto')
 
 const register = async (req, res) => {
     try {
@@ -175,4 +177,90 @@ const logout = async (req, res) => {
     }
 }
 
-module.exports = { register, login, generateNewToken, logout }
+const fortgotPassword = async (req, res) => {
+    try {
+        const { email } = req.query
+        if (!email)
+            return res.status(400).json({
+                err: 1,
+                msg: 'Email invalid',
+            })
+        const user = await User.findOne({ email })
+        if (!user)
+            return res.status(404).json({
+                err: 1,
+                msg: 'User not found',
+            })
+        const resetToken = user.createPasswordChangeToken()
+        await user.save()
+
+        const html = `Please click on the link below to change your password. This link will expire after 15 minutes 
+                    <a href=${process.env.URL_SERVER}/api/user/reset-password/${resetToken}>Click here</a>`
+        const data = {
+            email,
+            html,
+        }
+        const response = await sendEmail(data)
+        if (!response)
+            return res.status(400).json({
+                err: 0,
+                msg: 'Send email failed',
+            })
+        res.status(200).json({
+            err: 0,
+            response,
+        })
+    } catch (error) {
+        res.status(500).json({
+            err: 1,
+            msg: 'Internal server error',
+        })
+    }
+}
+
+const resetPassword = async (req, res) => {
+    try {
+        const { password, token } = req.body
+        if (!password || !token)
+            return res.status(400).json({
+                err: 1,
+                msg: 'Password or token invalid',
+            })
+        const passwordResetToken = crypto
+            .createHash('sha256')
+            .update(token)
+            .digest('hex')
+        const user = await User.findOne({
+            passwordResetToken,
+            passwordResetExpires: { $gt: Date.now() },
+        })
+        if (!user)
+            return res.status(400).json({
+                err: 1,
+                msg: 'Invalid reset token',
+            })
+        user.password = hashPassword(password)
+        user.passwordResetToken = undefined
+        user.passwordChangeAt = Date.now()
+        user.passwordResetExpires = undefined
+        await user.save()
+        res.status(201).json({
+            err: 0,
+            msg: 'Reset password succesfully',
+        })
+    } catch (error) {
+        res.status(500).json({
+            err: 1,
+            msg: 'Internal server error',
+        })
+    }
+}
+
+module.exports = {
+    register,
+    login,
+    generateNewToken,
+    logout,
+    fortgotPassword,
+    resetPassword,
+}

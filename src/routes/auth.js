@@ -14,6 +14,10 @@ const User = require('../models/user')
 
 const router = express.Router()
 
+router.put('/reset-password', authController.resetPassword)
+
+router.get('/forgot-password', authController.fortgotPassword)
+
 router.post('/refresh-token', authController.generateNewToken)
 
 router.post('/logout', authController.logout)
