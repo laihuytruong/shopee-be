@@ -1,11 +1,12 @@
-const userRoute = require('./userRoute')
+const userRoute = require('./user')
+const authRoute = require('./auth')
+const { notFound } = require('../middleware/handleError')
 
 const initRoute = (app) => {
-  app.use('/api/user', userRoute)
+    app.use('/api/users', userRoute)
+    app.use('/api/auth', authRoute)
 
-  app.use('/', (req, res) => {
-    res.send('Hello world!')
-  })
+    app.use(notFound('Page not found!'))
 }
 
 module.exports = initRoute
