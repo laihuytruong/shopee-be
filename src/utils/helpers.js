@@ -22,9 +22,23 @@ const generateRefreshToken = (uid) => {
     })
 }
 
+const convertVietnameseToEnglish = (vietnameseString) => {
+    const normalizedString = vietnameseString.toLowerCase().normalize('NFD')
+    return normalizedString.replace(/[\u0300-\u036f]/g, '-')
+}
+
+const getFileNameCloudinary = (image) => {
+    const arr = image.split('/')
+    const filename =
+        arr[arr.length - 2] + '/' + arr[arr.length - 1].split('.')[0]
+    return filename
+}
+
 module.exports = {
     hashPassword,
     comparePassword,
     generateAccessToken,
     generateRefreshToken,
+    convertVietnameseToEnglish,
+    getFileNameCloudinary
 }

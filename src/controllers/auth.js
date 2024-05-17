@@ -30,7 +30,7 @@ const register = async (req, res) => {
     } catch (error) {
         res.status(500).json({
             err: 1,
-            msg: 'Internal server error',
+            msg: error.message,
         })
     }
 }
@@ -39,31 +39,40 @@ const login = async (req, res) => {
     try {
         const { data, dataModel } = req
         if (!dataModel)
-            return res.status(400).json({
+            return res.status(405).json({
                 err: 1,
                 msg: 'Email incorrect',
             })
         if (!comparePassword(data.password, dataModel.password))
-            return res.status(400).json({
+            return res.status(405).json({
                 err: 1,
                 msg: 'Password incorrect',
             })
-        const { password, role, ...userData } = dataModel.toObject()
-
+        const user = await User.findById(dataModel._id).populate(
+            'role',
+            'roleName'
+        )
+        const {
+            password,
+            isBlocked,
+            passwordChangeAt,
+            refreshToken,
+            ...userData
+        } = user.toObject()
+        const role = userData.role
         // Generate access token and refresh token
-        const payload = { _id: dataModel._id, role }
-        const accessToken = generateAccessToken(payload, '1d')
-        const refreshToken = generateRefreshToken(dataModel._id)
-
+        const payload = { _id: user._id, role }
+        const accessToken = generateAccessToken(payload, '2d')
+        const newRefreshToken = generateRefreshToken(user._id)
         // Save refresh token to db
         await User.findByIdAndUpdate(
-            dataModel._id,
-            { refreshToken },
+            user._id,
+            { refreshToken: newRefreshToken },
             { new: true }
         )
 
         // Save refresh token to cookie
-        res.cookie('refreshToken', refreshToken, {
+        res.cookie('refreshToken', newRefreshToken, {
             httpOnly: true,
             maxAge: 7 * 24 * 60 * 60 * 1000,
         })
@@ -77,7 +86,7 @@ const login = async (req, res) => {
     } catch (error) {
         res.status(500).json({
             err: 1,
-            msg: 'Internal server error',
+            msg: error.message,
         })
     }
 }
@@ -110,7 +119,6 @@ const generateNewToken = async (req, res) => {
                     _id: decode._id,
                     refreshToken,
                 })
-
                 if (!user) {
                     return res.status(401).json({
                         err: 1,
@@ -133,7 +141,7 @@ const generateNewToken = async (req, res) => {
     } catch (error) {
         res.status(500).json({
             err: 1,
-            msg: 'Internal server error',
+            msg: error.message,
         })
     }
 }
@@ -172,7 +180,7 @@ const logout = async (req, res) => {
         console.log(error)
         res.status(500).json({
             err: 1,
-            msg: 'Internal server error',
+            msg: error.message,
         })
     }
 }
@@ -211,9 +219,10 @@ const fortgotPassword = async (req, res) => {
             response,
         })
     } catch (error) {
+        console.log(error)
         res.status(500).json({
             err: 1,
-            msg: 'Internal server error',
+            msg: error.message,
         })
     }
 }
@@ -251,7 +260,7 @@ const resetPassword = async (req, res) => {
     } catch (error) {
         res.status(500).json({
             err: 1,
-            msg: 'Internal server error',
+            msg: error.message,
         })
     }
 }

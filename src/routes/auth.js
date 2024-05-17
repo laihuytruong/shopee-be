@@ -3,8 +3,8 @@ const authController = require('../controllers/auth')
 const { checkSchema } = require('express-validator')
 const {
     registerValidation,
-    authValidation,
-} = require('../middleware/validationSchema')
+    loginValidation,
+} = require('../middleware/validation/authValidation')
 const {
     getData,
     checkExist,
@@ -24,9 +24,9 @@ router.post('/logout', authController.logout)
 
 router.post(
     '/login',
-    checkSchema(authValidation),
+    checkSchema(loginValidation),
     getData,
-    checkExist(User, 'email'),
+    checkExist(User, 'email', false),
     authController.login
 )
 
@@ -34,7 +34,7 @@ router.post(
     '/register',
     checkSchema(registerValidation),
     getData,
-    checkExist(User, 'email'),
+    checkExist(User, 'email', false),
     authController.register
 )
 

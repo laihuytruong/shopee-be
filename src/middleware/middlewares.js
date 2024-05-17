@@ -1,31 +1,38 @@
 const { validationResult, matchedData } = require('express-validator')
 const jwt = require('jsonwebtoken')
+const Role = require('../models/role')
+const cloudinary = require('cloudinary').v2
 
 const getData = (req, res, next) => {
     const result = validationResult(req)
     if (!result.isEmpty()) {
+        if (req.file && req.file.path) {
+            cloudinary.uploader.destroy(req.file.filename)
+        }
         return res.status(400).json({
             err: 1,
             errors: result.array(),
         })
     }
+
     const data = matchedData(req)
     req.data = data
     next()
 }
 
-const checkExist = (model, columnName) => async (req, res, next) => {
+const checkExist = (model, columnName, lower) => async (req, res, next) => {
     try {
         const { data } = req
         const query = {}
-        query[columnName] = data[columnName]
+        query[columnName] =
+            lower === false ? data[columnName] : data[columnName].toLowerCase()
         const dataModel = await model.findOne(query)
         req.dataModel = dataModel
         next()
     } catch (error) {
         res.status(500).json({
             err: 1,
-            msg: 'Internal server error',
+            msg: error.message,
         })
     }
 }
@@ -35,10 +42,9 @@ const verifyToken = async (req, res, next) => {
         if (req?.headers?.authorization?.startsWith('Bearer')) {
             const token = req.headers.authorization.split(' ')[1]
             jwt.verify(token, process.env.TOKEN_SECRET, (err, decode) => {
-                console.log(err)
                 if (err)
                     return res.status(401).json({
-                        err: 1, 
+                        err: 1,
                         msg: err.message,
                     })
                 req.user = decode
@@ -54,7 +60,55 @@ const verifyToken = async (req, res, next) => {
         console.log(error)
         res.status(500).json({
             err: 1,
-            msg: 'Internal server error',
+            msg: error.message,
+        })
+    }
+}
+
+const checkAdmin = async (req, res, next) => {
+    try {
+        const { role } = req.user
+        const roleData = await Role.findOne({ _id: role })
+        if (!roleData)
+            return res.status(401).json({
+                err: 1,
+                msg: 'Invalid role',
+            })
+        if (roleData.roleName !== 'admin')
+            return res.status(401).json({
+                err: 1,
+                msg: 'Please login admin account',
+            })
+        next()
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({
+            err: 1,
+            msg: error.message,
+        })
+    }
+}
+
+const checkSellerOrAdmin = async (req, res, next) => {
+    try {
+        const { role } = req.user
+        const roleData = await Role.findOne({ _id: role })
+        if (!roleData)
+            return res.status(401).json({
+                err: 1,
+                msg: 'Invalid role',
+            })
+        if (roleData.roleName === 'user')
+            return res.status(401).json({
+                err: 1,
+                msg: 'Please login admin or seller account',
+            })
+        next()
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({
+            err: 1,
+            msg: error.message,
         })
     }
 }
@@ -63,4 +117,6 @@ module.exports = {
     getData,
     checkExist,
     verifyToken,
+    checkAdmin,
+    checkSellerOrAdmin,
 }
