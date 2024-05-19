@@ -5,6 +5,7 @@ const {
     comparePassword,
     generateAccessToken,
     generateRefreshToken,
+    responseData,
 } = require('../utils/helpers')
 const sendEmail = require('../utils/sendEmail')
 const crypto = require('crypto')
@@ -12,42 +13,26 @@ const crypto = require('crypto')
 const register = async (req, res) => {
     try {
         const { data, dataModel } = req
-        if (dataModel)
-            return res.status(404).json({
-                err: 1,
-                msg: 'Email already exist',
-            })
+        if (dataModel) return responseData(res, 400, 1, 'Email already exist')
         const dataNewUser = {
             ...data,
             password: hashPassword(data.password),
         }
-        const newUser = new User(dataNewUser)
-        const response = await newUser.save()
-        res.status(201).json({
-            err: response ? 0 : 1,
-            msg: response ? 'Register successfully' : 'Register failed',
-        })
+        const response = await User.create(dataNewUser)
+        if (!response) return responseData(res, 400, 1, 'Register failed')
+        responseData(res, 201, 0, 'Register successfully', null, response)
     } catch (error) {
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 
 const login = async (req, res) => {
     try {
         const { data, dataModel } = req
-        if (!dataModel)
-            return res.status(405).json({
-                err: 1,
-                msg: 'Email incorrect',
-            })
+        if (!dataModel) return responseData(res, 400, 1, 'Email incorrect')
+
         if (!comparePassword(data.password, dataModel.password))
-            return res.status(405).json({
-                err: 1,
-                msg: 'Password incorrect',
-            })
+            return responseData(res, 400, 1, 'Password incorrect')
         const user = await User.findById(dataModel._id).populate(
             'role',
             'roleName'
@@ -57,9 +42,9 @@ const login = async (req, res) => {
             isBlocked,
             passwordChangeAt,
             refreshToken,
-            ...userData
+            ...response
         } = user.toObject()
-        const role = userData.role
+        const role = response.role
         // Generate access token and refresh token
         const payload = { _id: user._id, role }
         const accessToken = generateAccessToken(payload, '2d')
@@ -76,18 +61,17 @@ const login = async (req, res) => {
             httpOnly: true,
             maxAge: 7 * 24 * 60 * 60 * 1000,
         })
-
-        res.status(200).json({
-            err: 0,
-            msg: 'Login successfully',
-            accessToken: `Bearer ${accessToken}`,
-            userData,
-        })
+        responseData(
+            res,
+            200,
+            0,
+            'Login successfully',
+            null,
+            response,
+            `Bearer ${accessToken}`
+        )
     } catch (error) {
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 
@@ -97,10 +81,7 @@ const generateNewToken = async (req, res) => {
 
         // Check cookie and refreshToken
         if (!refreshToken) {
-            return res.status(401).json({
-                err: 1,
-                msg: 'Unauthorized',
-            })
+            return responseData(res, 401, 1, 'Unauthorized')
         }
 
         jwt.verify(
@@ -108,10 +89,7 @@ const generateNewToken = async (req, res) => {
             process.env.REFRESH_TOKEN_SECRET,
             async (err, decode) => {
                 if (err) {
-                    return res.status(401).json({
-                        err: 1,
-                        msg: err.message,
-                    })
+                    return responseData(res, 401, 1, err.message)
                 }
 
                 // Find user contain decode._id and cookie.refreshToken
@@ -120,10 +98,12 @@ const generateNewToken = async (req, res) => {
                     refreshToken,
                 })
                 if (!user) {
-                    return res.status(401).json({
-                        err: 1,
-                        msg: 'Unauthorized. Please login again!',
-                    })
+                    return responseData(
+                        res,
+                        401,
+                        1,
+                        'Unauthorized. Please login again!'
+                    )
                 }
 
                 // Create new access token
@@ -132,17 +112,11 @@ const generateNewToken = async (req, res) => {
                     '2d'
                 )
 
-                return res.status(201).json({
-                    err: 0,
-                    newToken: `Bearer ${newToken}`,
-                })
+                responseData(res, 201, 0, '', null, null, `Bearer ${newToken}`)
             }
         )
     } catch (error) {
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 
@@ -152,10 +126,7 @@ const logout = async (req, res) => {
 
         // Check exist refreshToken
         if (!refreshToken) {
-            return res.status(401).json({
-                err: 1,
-                msg: 'Not log in',
-            })
+            return responseData(res, 401, 1, 'Not log in')
         }
 
         // Delete refresh token on db
@@ -172,33 +143,19 @@ const logout = async (req, res) => {
             httpOnly: true,
             secure: true,
         })
-        return res.status(200).json({
-            err: 0,
-            msg: 'Logout successfully',
-        })
+        responseData(res, 200, 0, 'Logout successfully')
     } catch (error) {
         console.log(error)
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 
 const fortgotPassword = async (req, res) => {
     try {
         const { email } = req.query
-        if (!email)
-            return res.status(400).json({
-                err: 1,
-                msg: 'Email invalid',
-            })
+        if (!email) return responseData(res, 400, 1, 'Email invalid')
         const user = await User.findOne({ email })
-        if (!user)
-            return res.status(404).json({
-                err: 1,
-                msg: 'User not found',
-            })
+        if (!user) return responseData(res, 404, 1, 'User not found')
         const resetToken = user.createPasswordChangeToken()
         await user.save()
 
@@ -209,21 +166,11 @@ const fortgotPassword = async (req, res) => {
             html,
         }
         const response = await sendEmail(data)
-        if (!response)
-            return res.status(400).json({
-                err: 0,
-                msg: 'Send email failed',
-            })
-        res.status(200).json({
-            err: 0,
-            response,
-        })
+        if (!response) return responseData(res, 400, 1, 'Send email failed')
+        responseData(res, 200, 0, '', null, response)
     } catch (error) {
         console.log(error)
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 
@@ -231,10 +178,7 @@ const resetPassword = async (req, res) => {
     try {
         const { password, token } = req.body
         if (!password || !token)
-            return res.status(400).json({
-                err: 1,
-                msg: 'Password or token invalid',
-            })
+            return responseData(res, 400, 1, 'Password or token invalid')
         const passwordResetToken = crypto
             .createHash('sha256')
             .update(token)
@@ -243,25 +187,15 @@ const resetPassword = async (req, res) => {
             passwordResetToken,
             passwordResetExpires: { $gt: Date.now() },
         })
-        if (!user)
-            return res.status(400).json({
-                err: 1,
-                msg: 'Invalid reset token',
-            })
+        if (!user) return responseData(res, 400, 1, 'Invalid reset token')
         user.password = hashPassword(password)
         user.passwordResetToken = undefined
         user.passwordChangeAt = Date.now()
         user.passwordResetExpires = undefined
         await user.save()
-        res.status(201).json({
-            err: 0,
-            msg: 'Reset password succesfully',
-        })
+        responseData(res, 200, 0, 'Reset password successfully')
     } catch (error) {
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 

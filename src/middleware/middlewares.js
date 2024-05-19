@@ -30,10 +30,7 @@ const checkExist = (model, columnName, lower) => async (req, res, next) => {
         req.dataModel = dataModel
         next()
     } catch (error) {
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 
@@ -58,10 +55,7 @@ const verifyToken = async (req, res, next) => {
         }
     } catch (error) {
         console.log(error)
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 
@@ -82,10 +76,7 @@ const checkAdmin = async (req, res, next) => {
         next()
     } catch (error) {
         console.log(error)
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 
@@ -106,10 +97,7 @@ const checkSellerOrAdmin = async (req, res, next) => {
         next()
     } catch (error) {
         console.log(error)
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 

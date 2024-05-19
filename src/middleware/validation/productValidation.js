@@ -31,10 +31,32 @@ const productValidation = {
     sold: {},
     image: {},
     color: {},
-    rating: {},
     totalRating: {},
+}
+
+const ratingValidation = {
+    star: {
+        notEmpty: {
+            errorMessage: 'Star cannot be empty',
+        },
+    },
+    comment: {},
+    pid: {
+        notEmpty: {
+            errorMessage: 'Product id cannot be empty',
+        },
+        custom: {
+            options: (value) => {
+                if (!mongoose.Types.ObjectId.isValid(value)) {
+                    throw new Error('Invalid product id')
+                }
+                return true
+            },
+        },
+    },
 }
 
 module.exports = {
     productValidation,
+    ratingValidation,
 }

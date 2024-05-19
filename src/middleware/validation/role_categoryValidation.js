@@ -13,11 +13,7 @@ const categoryValidation = {
             errorMessage: 'Category name cannot be empty',
         },
     },
-    thumbnail: {
-        // notEmpty: {
-        //     errorMessage: 'Thumbnail cannot be empty',
-        // },
-    },
+    thumbnail: {},
 }
 
 module.exports = {

@@ -1,26 +1,14 @@
 const Role = require('../models/role')
 const mongoose = require('mongoose')
+const { responseData } = require('../utils/helpers')
 
 const getAllRoles = async (req, res) => {
     try {
-        const users = await Role.find()
-        if (!users)
-            return res.status(404).json({
-                err: 1,
-                msg: 'No role found',
-            })
-        res.status(200).json({
-            err: 0,
-            users: {
-                count: users.length,
-                data: users,
-            },
-        })
+        const response = await Role.find()
+        if (!response) return responseData(res, 404, 1, 'No role found')
+        responseData(res, 200, 0, '', response.length, response)
     } catch (error) {
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 
@@ -28,26 +16,18 @@ const createRole = async (req, res) => {
     try {
         const { roleName, description } = req.data
         const { dataModel } = req
-        const role = new Role({
+        const role = {
             roleName: roleName.toLowerCase(),
             description,
-        })
-        if (dataModel)
-            return res.status(400).json({
-                err: 1,
-                msg: 'Role already exist',
-            })
-        const newRole = await role.save()
-        res.status(201).json({
-            err: newRole ? 0 : 1,
-            msg: newRole ? 'Create role successfully' : 'Create role failed',
-        })
+        }
+        if (dataModel) return responseData(res, 400, 1, 'Role does not exist')
+        const response = await Role.create(role)
+
+        if (!response) return responseData(res, 400, 1, 'Create role failed')
+        responseData(res, 200, 0, '', null, response)
     } catch (error) {
         console.log(error)
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 
@@ -56,27 +36,19 @@ const updateRole = async (req, res) => {
         const { roleName, description } = req.data
         const { _id } = req.params
         if (!_id || !mongoose.Types.ObjectId.isValid(_id))
-            return res.status(400).json({
-                err: 1,
-                msg: 'Invalid ID',
-            })
-        const updateRole = await Role.findByIdAndUpdate(
+            return responseData(res, 400, 1, 'Invalid ID')
+        const response = await Role.findByIdAndUpdate(
             _id,
             { roleName: roleName.toLowerCase(), description },
             {
                 new: true,
             }
         )
-        res.status(updateRole ? 200 : 400).json({
-            err: updateRole ? 0 : 1,
-            msg: updateRole ? 'Update role successfully' : 'No role updated',
-        })
+        if (!response) return responseData(res, 400, 1, 'Update role failed')
+        responseData(res, 200, 0, 'Update role successfully')
     } catch (error) {
         console.log(error)
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 
@@ -84,21 +56,14 @@ const deleteRole = async (req, res) => {
     try {
         const { _id } = req.params
         if (!_id || !mongoose.Types.ObjectId.isValid(_id))
-            return res.status(400).json({
-                err: 1,
-                msg: 'Invalid ID',
-            })
-        const deleteRole = await Role.findByIdAndDelete(_id)
-        res.status(deleteRole ? 200 : 400).json({
-            err: deleteRole ? 0 : 1,
-            msg: deleteRole ? 'Delete role successfully' : 'No role updated',
-        })
+            return responseData(res, 400, 1, 'Invalid ID')
+        const response = await Role.findByIdAndDelete(_id)
+
+        if (!response) return responseData(res, 400, 1, 'No role updated')
+        responseData(res, 200, 0, 'Delete role successfully')
     } catch (error) {
         console.log(error)
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 

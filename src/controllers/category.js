@@ -1,28 +1,15 @@
 const mongoose = require('mongoose')
 const Category = require('../models/category')
-const { getFileNameCloudinary } = require('../utils/helpers')
+const { getFileNameCloudinary, responseData } = require('../utils/helpers')
 const cloudinary = require('cloudinary').v2
 
 const getAllCategories = async (req, res) => {
     try {
-        const categories = await Category.find()
-        if (!categories)
-            return res.status(404).json({
-                err: 1,
-                msg: 'No category found',
-            })
-        res.status(200).json({
-            err: 0,
-            categories: {
-                count: categories.length,
-                data: categories,
-            },
-        })
+        const response = await Category.find()
+        if (!response) return responseData(res, 404, 1, 'No category found')
+        responseData(res, 200, 0, '', response.length, response)
     } catch (error) {
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 
@@ -30,27 +17,14 @@ const getOneCategory = async (req, res) => {
     try {
         const { _id } = req.params
         if (!mongoose.Types.ObjectId.isValid(_id))
-            return res.status(400).json({
-                err: 1,
-                msg: 'Invalid category id',
-            })
-        const category = await Category.findById(
+            return responseData(res, 400, 1, 'Invalid category id')
+        const response = await Category.findById(
             new mongoose.Types.ObjectId(_id)
         )
-        if (!category)
-            return res.status(404).json({
-                err: 1,
-                msg: 'No category found',
-            })
-        res.status(200).json({
-            err: 0,
-            category,
-        })
+        if (!response) return responseData(res, 404, 1, 'No category found')
+        responseData(res, 200, 0, '', null, response)
     } catch (error) {
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 
@@ -65,10 +39,7 @@ const createCategory = async (req, res) => {
         console.log('fileData: ', fileData)
         if (dataModel) {
             if (fileData) cloudinary.uploader.destroy(fileData.filename)
-            return res.status(400).json({
-                err: 1,
-                msg: 'Category already exist',
-            })
+            return responseData(res, 400, 1, 'Category already exist')
         }
         const newCategory = {
             categoryName,
@@ -79,13 +50,20 @@ const createCategory = async (req, res) => {
             err: response ? 0 : 1,
             data: response ? response : {},
         })
+        if (!response)
+            return responseData(res, 400, 1, 'Create category failed')
+        responseData(
+            res,
+            201,
+            0,
+            'Create category successfully',
+            null,
+            response
+        )
         if (!response && fileData)
             cloudinary.uploader.destroy(fileData.filename)
     } catch (error) {
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
         if (fileData) cloudinary.uploader.destroy(fileData.filename)
     }
 }
@@ -97,10 +75,7 @@ const updateCategory = async (req, res) => {
         const { _id } = req.params
         if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
             if (fileData) cloudinary.uploader.destroy(fileData.filename)
-            return res.status(400).json({
-                err: 1,
-                msg: 'Invalid ID',
-            })
+            return responseData(res, 400, 1, 'Invalid ID')
         }
         const response = await Category.findByIdAndUpdate(
             _id,
@@ -112,19 +87,12 @@ const updateCategory = async (req, res) => {
                 new: true,
             }
         )
-        res.status(201).json({
-            err: response ? 0 : 1,
-            data: response
-                ? 'Updated category successfully'
-                : 'No category updated',
-        })
+        if (!response) return responseData(res, 400, 1, 'No category updated')
+        responseData(res, 200, 0, 'Updated category successfully')
         if (!response && fileData)
             cloudinary.uploader.destroy(fileData.filename)
     } catch (error) {
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
         if (fileData) cloudinary.uploader.destroy(fileData.filename)
     }
 }
@@ -133,26 +101,21 @@ const deleteCategory = async (req, res) => {
     try {
         const { _id } = req.params
         if (!_id || !mongoose.Types.ObjectId.isValid(_id))
-            return res.status(400).json({
-                err: 1,
-                msg: 'Invalid ID',
-            })
+            return responseData(res, 400, 1, 'Invalid ID')
         const response = await Category.findByIdAndDelete(_id)
-        res.status(response ? 200 : 400).json({
-            err: response ? 0 : 1,
-            response: response
-                ? `Category with categoryName ${response.categoryName} deleted`
-                : 'No user deleted',
-        })
         if (!response) {
             const filename = getFileNameCloudinary(response.thumbnail)
             cloudinary.uploader.destroy(filename)
+            return responseData(res, 400, 1, 'No user deleted')
         }
+        responseData(
+            res,
+            200,
+            0,
+            `Category with categoryName ${response.categoryName} deleted`
+        )
     } catch (error) {
-        res.status(500).json({
-            err: 1,
-            msg: error.message,
-        })
+        responseData(res, 500, 1, error.message)
     }
 }
 
