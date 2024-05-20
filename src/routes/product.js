@@ -2,10 +2,9 @@ const express = require('express')
 const productController = require('../controllers/product')
 const {
     verifyToken,
-    checkSellerOrAdmin,
+    checkAdmin,
     getData,
     checkExist,
-    checkAdmin,
 } = require('../middleware/middlewares')
 const {
     productValidation,
@@ -31,7 +30,7 @@ router.put(
     '/:_id',
     verifyToken,
     // uploadCloud.single('avatar'),
-    checkSellerOrAdmin,
+    checkAdmin,
     checkSchema(productValidation),
     getData,
     productController.updateProduct
@@ -40,7 +39,7 @@ router.put(
 router.post(
     '/',
     verifyToken,
-    checkSellerOrAdmin,
+    checkAdmin,
     // uploadCloud.array('image'),
     checkSchema(productValidation),
     getData,

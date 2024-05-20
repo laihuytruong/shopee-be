@@ -30,13 +30,11 @@ const getOneCategory = async (req, res) => {
 
 const createCategory = async (req, res) => {
     const fileData = req.file
-    console.log(fileData)
     try {
         const {
             data: { categoryName },
             dataModel,
         } = req
-        console.log('fileData: ', fileData)
         if (dataModel) {
             if (fileData) cloudinary.uploader.destroy(fileData.filename)
             return responseData(res, 400, 1, 'Category already exist')

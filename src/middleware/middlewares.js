@@ -1,6 +1,7 @@
 const { validationResult, matchedData } = require('express-validator')
 const jwt = require('jsonwebtoken')
 const Role = require('../models/role')
+const { responseData } = require('../utils/helpers')
 const cloudinary = require('cloudinary').v2
 
 const getData = (req, res, next) => {
@@ -16,6 +17,7 @@ const getData = (req, res, next) => {
     }
 
     const data = matchedData(req)
+    console.log('data: ', data)
     req.data = data
     next()
 }
@@ -24,10 +26,15 @@ const checkExist = (model, columnName, lower) => async (req, res, next) => {
     try {
         const { data } = req
         const query = {}
-        query[columnName] =
-            lower === false ? data[columnName] : data[columnName].toLowerCase()
-        const dataModel = await model.findOne(query)
+        if (data) {
+            query[columnName] =
+                lower === false
+                    ? data[columnName]
+                    : data[columnName].toLowerCase()
+        }
+        const dataModel = await model.findOne(data ? query : req.body)
         req.dataModel = dataModel
+        console.log('dataModel: ', dataModel)
         next()
     } catch (error) {
         responseData(res, 500, 1, error.message)
@@ -80,31 +87,9 @@ const checkAdmin = async (req, res, next) => {
     }
 }
 
-const checkSellerOrAdmin = async (req, res, next) => {
-    try {
-        const { role } = req.user
-        const roleData = await Role.findOne({ _id: role })
-        if (!roleData)
-            return res.status(401).json({
-                err: 1,
-                msg: 'Invalid role',
-            })
-        if (roleData.roleName === 'user')
-            return res.status(401).json({
-                err: 1,
-                msg: 'Please login admin or seller account',
-            })
-        next()
-    } catch (error) {
-        console.log(error)
-        responseData(res, 500, 1, error.message)
-    }
-}
-
 module.exports = {
     getData,
     checkExist,
     verifyToken,
     checkAdmin,
-    checkSellerOrAdmin,
 }

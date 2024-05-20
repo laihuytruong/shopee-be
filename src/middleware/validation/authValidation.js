@@ -64,9 +64,6 @@ const bodyValidation = {
         },
     },
     dateOfBirth: {
-        notEmpty: {
-            errorMessage: 'Date of birth cannot be empty',
-        },
         custom: {
             options: (value) => {
                 const parts = value.split('/')

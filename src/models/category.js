@@ -5,7 +5,7 @@ const CategorySchema = new mongoose.Schema(
         categoryName: {
             type: String,
             require: true,
-            // unique: true,
+            unique: true,
         },
         thumbnail: {
             type: String,

@@ -7,8 +7,13 @@ const productValidation = {
         },
     },
     brand: {
-        notEmpty: {
-            errorMessage: 'Brand cannot be empty',
+        custom: {
+            options: (value) => {
+                if (!mongoose.Types.ObjectId.isValid(value)) {
+                    throw new Error('Invalid brand id')
+                }
+                return true
+            },
         },
     },
     description: {},

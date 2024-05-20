@@ -1,6 +1,7 @@
 const mongoose = require('mongoose')
 const Product = require('../models/product')
 const Category = require('../models/category')
+const Brand = require('../models/brand')
 const { generateSlug, responseData } = require('../utils/helpers')
 
 const getAllProducts = async (req, res) => {
@@ -24,9 +25,10 @@ const getAllProducts = async (req, res) => {
                 $options: 'i',
             }
         let queryCommand = Product.find(formattedQueries)
+            .populate('brand', 'brandName')
+            .populate('category', 'categoryName', 'Category')
 
         // Sorting
-        // -price, brand
         if (req.query.sort) {
             const sortBy = req.query.sort
                 .split(',')
@@ -77,18 +79,22 @@ const getOneProduct = async (req, res) => {
 const createProduct = async (req, res) => {
     try {
         const { data } = req
-        if (!mongoose.Types.ObjectId.isValid(data.category)) {
-            return responseData(res, 400, 1, 'Invalid category id')
-        }
         const category = await Category.findById(
             new mongoose.Types.ObjectId(data.category)
+        )
+        const brand = await Brand.findById(
+            new mongoose.Types.ObjectId(data.brand)
         )
         if (!category) {
             return responseData(res, 404, 1, 'Category not found')
         }
+        if (!brand) {
+            return responseData(res, 404, 1, 'Brand not found')
+        }
 
         data.slug = generateSlug(data.productName)
         data.category = new mongoose.Types.ObjectId(data.category)
+        data.brand = new mongoose.Types.ObjectId(data.brand)
 
         const response = await Product.create(data)
         if (!response)
@@ -105,28 +111,26 @@ const updateProduct = async (req, res) => {
             data,
             params: { _id },
         } = req
-        console.log(data)
-        if (
-            !_id ||
-            !mongoose.Types.ObjectId.isValid(_id) ||
-            !mongoose.Types.ObjectId.isValid(data.category)
-        ) {
-            return responseData(
-                res,
-                400,
-                1,
-                'Invalid product id or category id'
-            )
+        if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
+            return responseData(res, 400, 1, 'Invalid product id')
         }
         const category = await Category.findById(
             new mongoose.Types.ObjectId(data.category)
         )
+        const brand = await Brand.findById(
+            new mongoose.Types.ObjectId(data.brand)
+        )
         if (!category) {
             return responseData(res, 404, 1, 'Category not found')
+        }
+        if (!brand) {
+            return responseData(res, 404, 1, 'Brand not found')
         }
 
         data.slug = generateSlug(data.productName)
         data.category = new mongoose.Types.ObjectId(data.category)
+        data.brand = new mongoose.Types.ObjectId(data.brand)
+
         const response = await Product.findByIdAndUpdate(_id, data, {
             new: true,
         })

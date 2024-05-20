@@ -43,7 +43,7 @@ router.post(
     categoryController.createCategory
 )
 
-router.get('/:_id', verifyToken, checkAdmin, categoryController.getOneCategory)
-router.get('/', verifyToken, checkAdmin, categoryController.getAllCategories)
+router.get('/:_id', categoryController.getOneCategory)
+router.get('/', categoryController.getAllCategories)
 
 module.exports = router
