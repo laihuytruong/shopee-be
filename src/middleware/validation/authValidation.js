@@ -66,19 +66,23 @@ const bodyValidation = {
     dateOfBirth: {
         custom: {
             options: (value) => {
-                const parts = value.split('/')
-                const day = parts[0].padStart(2, '0')
-                const month = parts[1].padStart(2, '0')
-                const year = parts[2]
-                const formattedDate = `${day}/${month}/${year}`
-                const birth = moment(formattedDate, 'DD/MM/YYYY', true)
-                if (!birth) {
-                    throw new Error('Date of birth must be a dd/mm/yyyy format')
+                if (value) {
+                    const parts = value.split('/')
+                    const day = parts[0].padStart(2, '0')
+                    const month = parts[1].padStart(2, '0')
+                    const year = parts[2]
+                    const formattedDate = `${day}/${month}/${year}`
+                    const birth = moment(formattedDate, 'DD/MM/YYYY', true)
+                    if (!birth) {
+                        throw new Error(
+                            'Date of birth must be a dd/mm/yyyy format'
+                        )
+                    }
+                    if (!birth.isValid()) {
+                        throw new Error('Invalid date of birth')
+                    }
+                    return true
                 }
-                if (!birth.isValid()) {
-                    throw new Error('Invalid date of birth')
-                }
-                return true
             },
         },
     },

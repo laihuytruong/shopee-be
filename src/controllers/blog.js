@@ -209,6 +209,29 @@ const deleteBlog = async (req, res) => {
     }
 }
 
+const uploadImageBlog = async (req, res) => {
+    try {
+        const { _id } = req.params
+        if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
+            return responseData(res, 400, 1, 'Invalid ID')
+        }
+        console.log(req.files)
+        if (!req.file) return responseData(res, 400, 1, 'No image upload')
+        const response = await Blog.findByIdAndUpdate(
+            _id,
+            {
+                thumbnail: req.file.path,
+            },
+            { new: true }
+        )
+        console.log(response)
+        if (!response) return responseData(res, 400, 1, 'Upload image failed')
+        responseData(res, 200, 1, 'Upload image successfully', null, response)
+    } catch (error) {
+        responseData(res, 500, 1, error.message)
+    }
+}
+
 module.exports = {
     createBlog,
     updateBlog,
@@ -217,4 +240,5 @@ module.exports = {
     likeBlog,
     dislikeBlog,
     deleteBlog,
+    uploadImageBlog,
 }

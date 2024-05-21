@@ -38,12 +38,19 @@ const UserSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
-        address: [
+        cart: [
             {
-                type: mongoose.Types.ObjectId,
-                ref: 'Address',
+                product: {
+                    type: mongoose.Types.ObjectId,
+                    ref: 'Product',
+                },
+                quantity: Number,
+                color: String,
             },
         ],
+        address: {
+            type: String,
+        },
         role: {
             type: mongoose.Types.ObjectId,
             default: new mongoose.Types.ObjectId('6646091905062f8ea9e1e7a8'),

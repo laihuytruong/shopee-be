@@ -27,6 +27,13 @@ router.put(
     blogController.updateBlog
 )
 
+router.put(
+    '/upload/:_id',
+    verifyToken,
+    uploadCloud.single('thumbnail'),
+    blogController.uploadImageBlog
+)
+
 router.post(
     '/',
     verifyToken,

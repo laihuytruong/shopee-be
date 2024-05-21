@@ -1,5 +1,6 @@
 const User = require('../models/user')
 const Role = require('../models/role')
+const Product = require('../models/product')
 const mongoose = require('mongoose')
 const moment = require('moment')
 const { getFileNameCloudinary, responseData } = require('../utils/helpers')
@@ -34,14 +35,12 @@ const getCurrentUser = async (req, res) => {
 }
 
 const updateUser = async (req, res) => {
-    const fileData = req.file
     try {
         const {
             params: { _id },
             data,
         } = req
         if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
-            if (fileData) cloudinary.uploader.destroy(fileData.filename)
             return responseData(res, 400, 1, 'Invalid ID')
         }
         const response = await User.findByIdAndUpdate(
@@ -53,22 +52,22 @@ const updateUser = async (req, res) => {
                         ? data.address
                         : [],
                 dateOfBirth: moment(data.dateOfBirth, 'DD/MM/YYYY').toDate(),
-                avatar: fileData.path,
+                avatar: req.file?.path,
             },
             {
                 new: true,
             }
         ).select('-refreshToken -password -role')
 
-        if (!response) return responseData(res, 400, 1, 'Update user failed')
+        if (!response && req.file) {
+            cloudinary.uploader.destroy(req.file.filename)
+            return responseData(res, 400, 1, 'Update user failed')
+        }
         responseData(res, 200, 0, '', null, response)
-
-        if (!response && fileData)
-            cloudinary.uploader.destroy(fileData.filename)
     } catch (error) {
         console.log(error)
         responseData(res, 500, 1, error.message)
-        if (fileData) cloudinary.uploader.destroy(fileData.filename)
+        if (req.file) cloudinary.uploader.destroy(req.file.filename)
     }
 }
 
@@ -113,15 +112,77 @@ const deleteUser = async (req, res) => {
         const response = await User.findByIdAndDelete(_id)
         if (!response) return responseData(res, 400, 1, 'No user deleted')
         responseData(res, 200, 0, `User with email ${response.email} deleted`)
-        if (
-            response &&
-            response.avatar.startWith('https://res.cloudinary.com')
-        ) {
-            const filename = getFileNameCloudinary(response.avatar)
-            cloudinary.uploader.destroy(filename)
-        }
     } catch (error) {
         console.log(error)
+        responseData(res, 500, 1, error.message)
+    }
+}
+
+const updateUserAddress = async (req, res) => {
+    try {
+        const { _id } = req.user
+        if (!req.body.address)
+            return responseData(res, 400, 1, 'Address cannot be empty')
+        const response = await User.findByIdAndUpdate(
+            _id,
+            { address: req.body.address },
+            { new: true }
+        ).select('-password -role -refreshToken')
+        if (!response) return responseData(res, 400, 1, 'Cannot update address')
+        responseData(res, 200, 0, 'Update address successfully', null, response)
+    } catch (error) {
+        responseData(res, 500, 1, error.message)
+    }
+}
+
+const updateCart = async (req, res) => {
+    try {
+        const { _id } = req.user
+        const { data } = req
+
+        const product = await Product.findById(data.pid)
+        if (!product) return responseData(res, 404, 1, 'Product not found')
+
+        const user = await User.findById(_id).select('cart')
+
+        const findProduct = user?.cart.find(
+            (el) =>
+                el.product.toString() === data.pid && el.color === data.color
+        )
+
+        if (findProduct) {
+            // Nếu sản phẩm đã tồn tại trong giỏ hàng với cùng màu, cập nhật số lượng
+            await User.updateOne(
+                {
+                    cart: { $elemMatch: findProduct },
+                },
+                {
+                    $set: {
+                        'cart.$.quantity':
+                            findProduct.quantity + +data.quantity,
+                    },
+                },
+                { new: true }
+            )
+            return responseData(res, 200, 0, 'Add product to cart successfully')
+        } else {
+            // Nếu sản phẩm chưa tồn tại trong giỏ hàng với cùng màu, thêm sản phẩm mới vào giỏ hàng
+            await User.findByIdAndUpdate(
+                _id,
+                {
+                    $push: {
+                        cart: {
+                            product: data.pid,
+                            quantity: +data.quantity,
+                            color: data.color,
+                        },
+                    },
+                },
+                { new: true }
+            )
+            return responseData(res, 200, 0, 'Add product to cart successfully')
+        }
+    } catch (error) {
         responseData(res, 500, 1, error.message)
     }
 }
@@ -132,4 +193,6 @@ module.exports = {
     updateUser,
     updateUserByAdmin,
     deleteUser,
+    updateUserAddress,
+    updateCart,
 }

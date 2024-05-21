@@ -7,9 +7,7 @@ const cloudinary = require('cloudinary').v2
 const getData = (req, res, next) => {
     const result = validationResult(req)
     if (!result.isEmpty()) {
-        if (req.file && req.file.path) {
-            cloudinary.uploader.destroy(req.file.filename)
-        }
+        if (req.file) cloudinary.uploader.destroy(req.file.filename)
         return res.status(400).json({
             err: 1,
             errors: result.array(),
@@ -17,7 +15,6 @@ const getData = (req, res, next) => {
     }
 
     const data = matchedData(req)
-    console.log('data: ', data)
     req.data = data
     next()
 }
@@ -34,7 +31,6 @@ const checkExist = (model, columnName, lower) => async (req, res, next) => {
         }
         const dataModel = await model.findOne(data ? query : req.body)
         req.dataModel = dataModel
-        console.log('dataModel: ', dataModel)
         next()
     } catch (error) {
         responseData(res, 500, 1, error.message)

@@ -29,18 +29,24 @@ router.put(
 router.put(
     '/:_id',
     verifyToken,
-    // uploadCloud.single('avatar'),
     checkAdmin,
     checkSchema(productValidation),
     getData,
     productController.updateProduct
 )
 
+router.put(
+    '/upload/:_id',
+    verifyToken,
+    checkAdmin,
+    uploadCloud.array('image', 10),
+    productController.uploadImagesProduct
+)
+
 router.post(
     '/',
     verifyToken,
     checkAdmin,
-    // uploadCloud.array('image'),
     checkSchema(productValidation),
     getData,
     productController.createProduct

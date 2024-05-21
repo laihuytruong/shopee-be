@@ -7,7 +7,6 @@ const { generateSlug, responseData } = require('../utils/helpers')
 const getAllProducts = async (req, res) => {
     try {
         const queries = { ...req.query }
-        console.log(req.query)
         const excludeFields = ['limit', 'sort', 'page', 'fields']
         excludeFields.forEach((el) => delete queries[el])
 
@@ -48,7 +47,7 @@ const getAllProducts = async (req, res) => {
 
         // Pagination
         const page = +req.query.page || 1
-        const limit = +req.query.limit || 2
+        const limit = +req.query.limit || 10
         const skip = (page - 1) * limit
         queryCommand.skip(skip).limit(limit)
 
@@ -221,6 +220,31 @@ const handleRating = async (req, res) => {
     }
 }
 
+const uploadImagesProduct = async (req, res) => {
+    try {
+        const { _id } = req.params
+        if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
+            return responseData(res, 400, 1, 'Invalid ID')
+        }
+        console.log(req.files)
+        if (!req.files) return responseData(res, 400, 1, 'No image upload')
+        const response = await Product.findByIdAndUpdate(
+            _id,
+            {
+                $push: {
+                    image: { $each: req.files.map((image) => image.path) },
+                },
+            },
+            { new: true }
+        )
+        console.log(response)
+        if (!response) return responseData(res, 400, 1, 'Upload image failed')
+        responseData(res, 200, 1, 'Upload image successfully', null, response)
+    } catch (error) {
+        responseData(res, 500, 1, error.message)
+    }
+}
+
 module.exports = {
     getAllProducts,
     getOneProduct,
@@ -228,4 +252,5 @@ module.exports = {
     updateProduct,
     deleteProduct,
     handleRating,
+    uploadImagesProduct,
 }

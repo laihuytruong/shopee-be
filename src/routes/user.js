@@ -4,17 +4,27 @@ const {
     verifyToken,
     checkAdmin,
     getData,
+    checkExist,
 } = require('../middleware/middlewares')
 const {
     updateUserValidation,
     updateUserByAdminValidation,
+    cartUserValidation,
 } = require('../middleware/validation/userValidation')
 const { checkSchema } = require('express-validator')
 const uploadCloud = require('../middleware/cloudinary')
-
+const User = require('../models/user')
 const router = express.Router()
 
 router.delete('/:_id', verifyToken, checkAdmin, userController.deleteUser)
+router.put('/address', verifyToken, userController.updateUserAddress)
+router.put(
+    '/cart',
+    verifyToken,
+    checkSchema(cartUserValidation),
+    getData,
+    userController.updateCart
+)
 router.put(
     '/:_id',
     verifyToken,

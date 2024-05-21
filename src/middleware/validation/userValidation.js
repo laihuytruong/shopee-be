@@ -11,27 +11,6 @@ const updateUserValidation = {
         },
     },
     ...bodyValidation,
-    address: {
-        // custom: {
-        //     options: (value) => {
-        //         try {
-        //             if (value.length > 1) {
-        //                 value.forEach((item) => {
-        //                     if (!mongoose.Types.ObjectId.isValid(item)) {
-        //                         throw new Error(
-        //                             'Address must contain only valid ObjectIds'
-        //                         )
-        //                     }
-        //                     return true
-        //                 })
-        //             }
-        //             return true
-        //         } catch (error) {
-        //             throw new Error(error.message)
-        //         }
-        //     },
-        // },
-    },
     avatar: {},
 }
 
@@ -62,7 +41,34 @@ const updateUserByAdminValidation = {
     },
 }
 
+const cartUserValidation = {
+    pid: {
+        notEmpty: {
+            errorMessage: 'Product id cannot be empty',
+        },
+        custom: {
+            options: (value) => {
+                if (!mongoose.Types.ObjectId.isValid(value)) {
+                    throw new Error('Invalid product id')
+                }
+                return true
+            },
+        },
+    },
+    quantity: {
+        notEmpty: {
+            errorMessage: 'Quantity cannot be empty',
+        },
+    },
+    color: {
+        notEmpty: {
+            errorMessage: 'Color cannot be empty',
+        },
+    },
+}
+
 module.exports = {
     updateUserValidation,
     updateUserByAdminValidation,
+    cartUserValidation,
 }
