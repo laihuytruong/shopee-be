@@ -1,8 +1,8 @@
 const mongoose = require('mongoose')
 
-const CategorySchema = new mongoose.Schema(
+const CategoryItemSchema = new mongoose.Schema(
     {
-        categoryName: {
+        categoryItemName: {
             type: String,
             require: true,
             unique: true,
@@ -10,9 +10,9 @@ const CategorySchema = new mongoose.Schema(
         slug: {
             type: String,
         },
-        thumbnail: {
-            type: String,
-            require: true,
+        category: {
+            type: mongoose.Types.ObjectId,
+            ref: 'Category',
         },
     },
     {
@@ -20,4 +20,4 @@ const CategorySchema = new mongoose.Schema(
     }
 )
 
-module.exports = mongoose.model('Category', CategorySchema)
+module.exports = mongoose.model('CategoryItem', CategoryItemSchema)

@@ -7,15 +7,6 @@ const ProductSchema = new mongoose.Schema(
             require: true,
             trim: true,
         },
-        slug: {
-            type: String,
-            require: true,
-            unique: true,
-            lowercase: true,
-        },
-        description: {
-            type: String,
-        },
         brand: {
             type: mongoose.Types.ObjectId,
             ref: 'Brand',
@@ -24,9 +15,9 @@ const ProductSchema = new mongoose.Schema(
             type: Number,
             require: true,
         },
-        category: {
+        categoryItem: {
             type: mongoose.Types.ObjectId,
-            ref: 'Category',
+            ref: 'CategoryItem',
         },
         quantity: {
             type: Number,
@@ -37,9 +28,6 @@ const ProductSchema = new mongoose.Schema(
             default: 0,
         },
         image: {
-            type: Array,
-        },
-        color: {
             type: Array,
         },
         rating: [
@@ -57,6 +45,10 @@ const ProductSchema = new mongoose.Schema(
             },
         ],
         totalRating: {
+            type: Number,
+            default: 0,
+        },
+        discount: {
             type: Number,
             default: 0,
         },

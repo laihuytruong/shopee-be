@@ -176,7 +176,8 @@ const fortgotPassword = async (req, res) => {
 
 const resetPassword = async (req, res) => {
     try {
-        const { password, token } = req.body
+        const { token } = req.params
+        const { password } = req.body
         if (!password || !token)
             return responseData(res, 400, 1, 'Password or token invalid')
         const passwordResetToken = crypto

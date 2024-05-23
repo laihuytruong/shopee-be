@@ -16,17 +16,16 @@ const productValidation = {
             },
         },
     },
-    description: {},
     price: {
         notEmpty: {
             errorMessage: 'Price cannot be empty',
         },
     },
-    category: {
+    categoryItem: {
         custom: {
             options: (value) => {
                 if (!mongoose.Types.ObjectId.isValid(value)) {
-                    throw new Error('Invalid category id')
+                    throw new Error('Invalid category item id')
                 }
                 return true
             },
@@ -35,7 +34,7 @@ const productValidation = {
     quantity: {},
     sold: {},
     image: {},
-    color: {},
+    discount: {},
     totalRating: {},
 }
 
@@ -61,7 +60,35 @@ const ratingValidation = {
     },
 }
 
+const productDetailValidation = {
+    productDetailName: {
+        notEmpty: {
+            errorMessage: 'Product detail name cannot be empty',
+        },
+    },
+    image: {},
+    color: {},
+    size: {},
+    price: {
+        notEmpty: {
+            errorMessage: 'Image cannot be empty',
+        },
+    },
+    inventory: {},
+    product: {
+        custom: {
+            options: (value) => {
+                if (!mongoose.Types.ObjectId.isValid(value)) {
+                    throw new Error('Invalid product detail id')
+                }
+                return true
+            },
+        },
+    },
+}
+
 module.exports = {
     productValidation,
     ratingValidation,
+    productDetailValidation,
 }

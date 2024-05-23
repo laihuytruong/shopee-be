@@ -237,6 +237,6 @@ module.exports = {
     generateAccessToken,
     generateRefreshToken,
     generateSlug,
-    getFileNameCloudinary,
     responseData,
+    getFileNameCloudinary,
 }

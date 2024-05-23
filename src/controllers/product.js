@@ -1,6 +1,6 @@
 const mongoose = require('mongoose')
 const Product = require('../models/product')
-const Category = require('../models/category')
+const CategoryItem = require('../models/categoryItem')
 const Brand = require('../models/brand')
 const { generateSlug, responseData } = require('../utils/helpers')
 
@@ -24,8 +24,8 @@ const getAllProducts = async (req, res) => {
                 $options: 'i',
             }
         let queryCommand = Product.find(formattedQueries)
-            .populate('brand', 'brandName')
-            .populate('category', 'categoryName', 'Category')
+            .populate('brand', 'brandName thumbnail')
+            .populate('categoryItem', 'categoryItemName')
 
         // Sorting
         if (req.query.sort) {
@@ -78,28 +78,32 @@ const getOneProduct = async (req, res) => {
 const createProduct = async (req, res) => {
     try {
         const { data } = req
-        const category = await Category.findById(
-            new mongoose.Types.ObjectId(data.category)
+        console.log(data)
+        const categoryItem = await CategoryItem.findById(
+            new mongoose.Types.ObjectId(data.categoryItem)
         )
         const brand = await Brand.findById(
             new mongoose.Types.ObjectId(data.brand)
         )
-        if (!category) {
-            return responseData(res, 404, 1, 'Category not found')
+        if (!categoryItem) {
+            return responseData(res, 404, 1, 'Category item not found')
         }
         if (!brand) {
             return responseData(res, 404, 1, 'Brand not found')
         }
-
-        data.slug = generateSlug(data.productName)
-        data.category = new mongoose.Types.ObjectId(data.category)
-        data.brand = new mongoose.Types.ObjectId(data.brand)
-
-        const response = await Product.create(data)
+        const response = await Product.create({
+            ...data,
+            slug: generateSlug(data.productName),
+            categoryItem: categoryItem._id,
+            brand: new mongoose.Types.ObjectId(data.brand),
+        })
+        console.log(1)
+        console.log(response)
         if (!response)
             return responseData(res, 400, 1, 'Product created failed')
         responseData(res, 201, 0, '', null, response)
     } catch (error) {
+        console.log(error)
         responseData(res, 500, 1, error.message)
     }
 }
@@ -113,28 +117,33 @@ const updateProduct = async (req, res) => {
         if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
             return responseData(res, 400, 1, 'Invalid product id')
         }
-        const category = await Category.findById(
-            new mongoose.Types.ObjectId(data.category)
+        const categoryItem = await CategoryItem.findById(
+            new mongoose.Types.ObjectId(data.categoryItem)
         )
         const brand = await Brand.findById(
             new mongoose.Types.ObjectId(data.brand)
         )
-        if (!category) {
-            return responseData(res, 404, 1, 'Category not found')
+        if (!categoryItem) {
+            return responseData(res, 404, 1, 'Category item not found')
         }
         if (!brand) {
             return responseData(res, 404, 1, 'Brand not found')
         }
 
-        data.slug = generateSlug(data.productName)
-        data.category = new mongoose.Types.ObjectId(data.category)
-        data.brand = new mongoose.Types.ObjectId(data.brand)
-
-        const response = await Product.findByIdAndUpdate(_id, data, {
-            new: true,
-        })
+        const response = await Product.findByIdAndUpdate(
+            _id,
+            {
+                ...data,
+                categoryItem: new mongoose.Types.ObjectId(data.categoryItem),
+                brand: new mongoose.Types.ObjectId(data.brand),
+            },
+            {
+                new: true,
+            }
+        )
+        console.log(response)
         if (!response) return responseData(res, 400, 1, 'No product updated')
-        responseData(res, 201, 0, 'Update product successfully')
+        responseData(res, 200, 0, 'Update product successfully')
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }
@@ -226,7 +235,6 @@ const uploadImagesProduct = async (req, res) => {
         if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
             return responseData(res, 400, 1, 'Invalid ID')
         }
-        console.log(req.files)
         if (!req.files) return responseData(res, 400, 1, 'No image upload')
         const response = await Product.findByIdAndUpdate(
             _id,

@@ -23,9 +23,10 @@ const getAllUsers = async (req, res) => {
 const getCurrentUser = async (req, res) => {
     try {
         const { _id } = req.user
-        const response = await User.findById(_id).select(
-            '-refreshToken -password -role'
-        )
+        const response = await User.findById(_id)
+            .select('-refreshToken -password -role')
+            .populate('cart')
+            .populate('cart.product', '-createdAt -updatedAt -__v')
         if (!response)
             return responseData(res, 401, 1, 'Unauthorized. Please login')
         responseData(res, 200, 0, '', null, response)
@@ -47,10 +48,6 @@ const updateUser = async (req, res) => {
             _id,
             {
                 ...data,
-                address:
-                    data.address && data.address?.length > 0
-                        ? data.address
-                        : [],
                 dateOfBirth: moment(data.dateOfBirth, 'DD/MM/YYYY').toDate(),
                 avatar: req.file?.path,
             },

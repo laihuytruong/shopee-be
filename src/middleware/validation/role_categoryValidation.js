@@ -1,3 +1,5 @@
+const mongoose = require('mongoose')
+
 const roleValidation = {
     roleName: {
         notEmpty: {
@@ -16,7 +18,26 @@ const categoryValidation = {
     thumbnail: {},
 }
 
+const categoryItemValidation = {
+    categoryItemName: {
+        notEmpty: {
+            errorMessage: 'Category item name cannot be empty',
+        },
+    },
+    category: {
+        custom: {
+            options: (value) => {
+                if (!mongoose.Types.ObjectId.isValid(value)) {
+                    throw new Error('Invalid category id')
+                }
+                return true
+            },
+        },
+    },
+}
+
 module.exports = {
     roleValidation,
     categoryValidation,
+    categoryItemValidation,
 }
