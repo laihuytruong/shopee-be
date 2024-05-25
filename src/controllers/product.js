@@ -2,59 +2,30 @@ const mongoose = require('mongoose')
 const Product = require('../models/product')
 const CategoryItem = require('../models/categoryItem')
 const Brand = require('../models/brand')
-const { generateSlug, responseData } = require('../utils/helpers')
+const {
+    generateSlug,
+    responseData,
+    paginationSortSearch,
+} = require('../utils/helpers')
 
 const getAllProducts = async (req, res) => {
     try {
-        const queries = { ...req.query }
-        const excludeFields = ['limit', 'sort', 'page', 'fields']
-        excludeFields.forEach((el) => delete queries[el])
-
-        let queryString = JSON.stringify(queries)
-        queryString = queryString.replace(
-            /\b(gte|gt|lte|lt)\b/g,
-            (matchedEl) => `$${matchedEl}`
+        const { page = 1, limit = 10, ...query } = req.query
+        const { response, count } = await paginationSortSearch(
+            Product,
+            query,
+            page,
+            limit
         )
-        const formattedQueries = JSON.parse(queryString)
 
-        // Filtering
-        if (queries?.productName)
-            formattedQueries.productName = {
-                $regex: queries.productName,
-                $options: 'i',
-            }
-        let queryCommand = Product.find(formattedQueries)
-            .populate('brand', 'brandName thumbnail')
-            .populate('categoryItem', 'categoryItemName')
-
-        // Sorting
-        if (req.query.sort) {
-            const sortBy = req.query.sort
-                .split(',')
-                .map((item) => item.trim())
-                .join(' ')
-            queryCommand = queryCommand.sort(sortBy)
+        const result = {
+            page: +page,
+            pageSize: +limit,
+            data: response,
         }
 
-        // Fields limiting
-        if (req.query.fields) {
-            const fields = req.query.fields
-                .split(',')
-                .map((item) => item.trim())
-                .join(' ')
-            queryCommand = queryCommand.select(fields)
-        }
-
-        // Pagination
-        const page = +req.query.page || 1
-        const limit = +req.query.limit || 10
-        const skip = (page - 1) * limit
-        queryCommand.skip(skip).limit(limit)
-
-        const response = await queryCommand
-        const count = await Product.find(formattedQueries).countDocuments()
         if (!response) return responseData(res, 404, 1, 'No product found')
-        responseData(res, 200, 0, '', count, response)
+        responseData(res, 200, 0, '', count, result)
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }
@@ -68,6 +39,8 @@ const getOneProduct = async (req, res) => {
         const response = await Product.findById(
             new mongoose.Types.ObjectId(_id)
         )
+            .populate('brand', 'brandName thumbnail')
+            .populate('categoryItem')
         if (!response) return responseData(res, 404, 1, 'No product found')
         responseData(res, 200, 0, '', null, response)
     } catch (error) {
@@ -134,6 +107,7 @@ const updateProduct = async (req, res) => {
             _id,
             {
                 ...data,
+                slug: generateSlug(data.productName),
                 categoryItem: new mongoose.Types.ObjectId(data.categoryItem),
                 brand: new mongoose.Types.ObjectId(data.brand),
             },
@@ -253,6 +227,40 @@ const uploadImagesProduct = async (req, res) => {
     }
 }
 
+const getProductsByCategory = async (req, res) => {
+    try {
+        const { slug } = req.params
+        const { page = 1, limit = 10, ...query } = req.query
+        console.log(query)
+        const filterCategory = await CategoryItem.find({
+            slug,
+        })
+        let searchQuery = query
+        if (filterCategory && filterCategory.length > 0) {
+            searchQuery = { ...query, categoryItem: filterCategory[0]._id }
+        }
+
+        const { response, count } = await paginationSortSearch(
+            Product,
+            searchQuery,
+            page,
+            limit
+        )
+
+        const result = {
+            page: +page,
+            pageSize: +limit,
+            data: response,
+        }
+        if (!response) {
+            return responseData(res, 404, 1, 'No product found')
+        }
+        responseData(res, 200, 0, '', count, result)
+    } catch (error) {
+        responseData(res, 500, 1, error.message)
+    }
+}
+
 module.exports = {
     getAllProducts,
     getOneProduct,
@@ -261,4 +269,5 @@ module.exports = {
     deleteProduct,
     handleRating,
     uploadImagesProduct,
+    getProductsByCategory,
 }

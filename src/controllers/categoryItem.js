@@ -30,6 +30,23 @@ const getCategoryItem = async (req, res) => {
     }
 }
 
+const getItemBySlug = async (req, res) => {
+    try {
+        const { slug } = req.params
+        const filterCategory = await Category.find({
+            slug,
+        })
+        const response = await CategoryItem.find({
+            category: filterCategory[0]._id,
+        })
+        if (!response)
+            return responseData(res, 404, 1, 'No category item found')
+        responseData(res, 200, 0, '', null, response)
+    } catch (error) {
+        responseData(res, 500, 1, error.message)
+    }
+}
+
 const createCategoryItem = async (req, res) => {
     try {
         const {
@@ -122,4 +139,5 @@ module.exports = {
     createCategoryItem,
     updateCategoryItem,
     deleteCategoryItem,
+    getItemBySlug,
 }
