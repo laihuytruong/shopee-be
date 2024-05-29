@@ -23,10 +23,17 @@ router.delete(
 )
 
 router.put(
-    '/:_id',
+    '/upload/:_id',
     verifyToken,
     checkAdmin,
     uploadCloud.single('thumbnail'),
+    categoryController.uploadImageCategory
+)
+
+router.put(
+    '/:_id',
+    verifyToken,
+    checkAdmin,
     checkSchema(categoryValidation),
     getData,
     categoryController.updateCategory
@@ -36,7 +43,6 @@ router.post(
     '/',
     verifyToken,
     checkAdmin,
-    uploadCloud.single('thumbnail'),
     checkSchema(categoryValidation),
     getData,
     checkExist(Category, 'categoryName', false),

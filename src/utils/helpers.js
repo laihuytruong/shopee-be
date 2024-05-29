@@ -1,5 +1,7 @@
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
+const { default: mongoose } = require('mongoose')
+const categoryItem = require('../models/categoryItem')
 
 const hashPassword = (password) => {
     const salt = bcrypt.genSaltSync(10)
@@ -231,6 +233,102 @@ const getFileNameCloudinary = (image) => {
     return filename
 }
 
+const paginationSortSearch = async (model, query, page, limit, sort) => {
+    const excludeFields = ['limit', 'sort', 'page', 'fields']
+    excludeFields.forEach((el) => delete query[el])
+    let queryString = JSON.stringify(query)
+    queryString = queryString.replace(
+        /\b(gte|gt|lte|lt)\b/g,
+        (matchedEl) => `$${matchedEl}`
+    )
+    const formattedQueries = JSON.parse(queryString)
+
+    // Filtering by productName
+    if (query?.productName)
+        formattedQueries.productName = {
+            $regex: query.productName,
+            $options: 'i',
+        }
+
+    // Filtering by price range
+    if (query?.price) {
+        const prices = query.price.split(',')
+        if (prices[0] !== '' && prices[1] !== '')
+            formattedQueries.price = {
+                $gte: +prices[0],
+                $lte: +prices[1],
+            }
+    }
+
+    // Filtering by brand
+    if (query?.brand) {
+        const brand = query.brand.split(',').map((item) => {
+            return new mongoose.Types.ObjectId(item)
+        })
+        formattedQueries.brand = {
+            $in: brand,
+        }
+    }
+
+    // Filtering by star rating
+    if (query?.totalRating) {
+        const rating = +query.totalRating
+        if (rating === 5) {
+            formattedQueries.totalRating = {
+                $eq: 5,
+            }
+        } else if (rating > 1 && rating < 5) {
+            formattedQueries.totalRating = {
+                $gte: rating,
+            }
+        }
+    }
+
+    let queryCommand = model.find(formattedQueries)
+
+    // Sorting
+    if (sort) {
+        let sortBy
+        if (sort === 'pop') {
+            model.find(formattedQueries)
+        } else if (sort === 'ctime') {
+            // Sắp xếp theo thời gian tạo
+            sortBy = '-createdAt'
+        } else if (sort === 'sales') {
+            // Lấy ra các sản phẩm có số lượng bán được lớn hơn 10
+            formattedQueries.sold = {
+                $gte: 10,
+            }
+            queryCommand = model.find(formattedQueries)
+        } else {
+            // Trường hợp còn lại, giữ nguyên sort
+            sortBy = sort
+                .split(',')
+                .map((item) => item.trim())
+                .join(' ')
+        }
+        if (sortBy) {
+            queryCommand = queryCommand.sort(sortBy)
+        }
+    }
+    // Fields limiting
+    if (query.fields) {
+        const fields = query.fields
+            .split(',')
+            .map((item) => item.trim())
+            .join(' ')
+        queryCommand = queryCommand.select(fields)
+    }
+
+    // Pagination
+    const skip = (+page - 1) * +limit
+    queryCommand.skip(skip).limit(+limit)
+
+    const response = await queryCommand
+    const count = await model.find(formattedQueries).countDocuments()
+    return { response, count }
+}
+
 module.exports = {
     hashPassword,
     comparePassword,
@@ -239,4 +337,5 @@ module.exports = {
     generateSlug,
     responseData,
     getFileNameCloudinary,
+    paginationSortSearch,
 }

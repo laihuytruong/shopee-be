@@ -1,5 +1,6 @@
 const mongoose = require('mongoose')
 const Product = require('../models/product')
+const Category = require('../models/category')
 const CategoryItem = require('../models/categoryItem')
 const Brand = require('../models/brand')
 const {
@@ -17,13 +18,12 @@ const getAllProducts = async (req, res) => {
             page,
             limit
         )
-
         const result = {
             page: +page,
             pageSize: +limit,
+            totalPage: Math.ceil(count / +limit),
             data: response,
         }
-
         if (!response) return responseData(res, 404, 1, 'No product found')
         responseData(res, 200, 0, '', count, result)
     } catch (error) {
@@ -231,25 +231,44 @@ const getProductsByCategory = async (req, res) => {
     try {
         const { slug } = req.params
         const { page = 1, limit = 10, ...query } = req.query
-        console.log(query)
-        const filterCategory = await CategoryItem.find({
-            slug,
-        })
         let searchQuery = query
-        if (filterCategory && filterCategory.length > 0) {
-            searchQuery = { ...query, categoryItem: filterCategory[0]._id }
+        let categoryItems = await CategoryItem.find({ slug })
+        if (categoryItems.length === 0 || !categoryItems) {
+            const category = await Category.findOne({ slug })
+            if (category) {
+                categoryItems = await CategoryItem.find({
+                    category: category._id,
+                })
+                if (categoryItems.length > 0) {
+                    const categoryItemIds = categoryItems.map((item) => {
+                        return item._id
+                    })
+                    searchQuery = {
+                        ...query,
+                        categoryItem: { $in: categoryItemIds },
+                    }
+                } else {
+                    return responseData(res, 404, 1, 'No product found')
+                }
+            } else {
+                return responseData(res, 404, 1, 'No category')
+            }
+        } else {
+            // If categoryItems found, search products within that categoryItem
+            searchQuery = { ...query, categoryItem: categoryItems[0]._id }
         }
 
         const { response, count } = await paginationSortSearch(
             Product,
             searchQuery,
             page,
-            limit
+            limit,
+            req.query.sort
         )
-
         const result = {
             page: +page,
             pageSize: +limit,
+            totalPage: Math.ceil(count / +limit),
             data: response,
         }
         if (!response) {
@@ -257,6 +276,7 @@ const getProductsByCategory = async (req, res) => {
         }
         responseData(res, 200, 0, '', count, result)
     } catch (error) {
+        console.log(error)
         responseData(res, 500, 1, error.message)
     }
 }

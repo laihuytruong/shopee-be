@@ -6,6 +6,13 @@ const BrandSchema = new mongoose.Schema(
             type: String,
             require: true,
         },
+        image: {
+            type: String,
+        },
+        category: {
+            type: mongoose.Types.ObjectId,
+            ref: 'Category',
+        },
     },
     {
         timestamps: true,

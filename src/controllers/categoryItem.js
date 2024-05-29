@@ -38,7 +38,7 @@ const getItemBySlug = async (req, res) => {
         })
         const response = await CategoryItem.find({
             category: filterCategory[0]._id,
-        })
+        }).populate('category')
         if (!response)
             return responseData(res, 404, 1, 'No category item found')
         responseData(res, 200, 0, '', null, response)

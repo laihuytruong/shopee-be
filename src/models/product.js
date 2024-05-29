@@ -7,6 +7,9 @@ const ProductSchema = new mongoose.Schema(
             require: true,
             trim: true,
         },
+        slug: {
+            type: String,
+        },
         brand: {
             type: mongoose.Types.ObjectId,
             ref: 'Brand',
@@ -28,7 +31,10 @@ const ProductSchema = new mongoose.Schema(
             default: 0,
         },
         image: {
-            type: Array,
+            type: [String],
+            default: [
+                'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQfFeFLwcGPyiM6MgD4eMSBmfKPQCQTQc-pDKQa1s8&s',
+            ],
         },
         rating: [
             {

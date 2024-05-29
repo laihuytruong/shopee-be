@@ -52,6 +52,7 @@ router.post(
     productController.createProduct
 )
 
+router.get('/category/:slug', productController.getProductsByCategory)
 router.get('/:_id', productController.getOneProduct)
 router.get('/', productController.getAllProducts)
 

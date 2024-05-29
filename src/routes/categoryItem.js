@@ -40,6 +40,7 @@ router.post(
     categoryItemController.createCategoryItem
 )
 
+router.get('/filter/:slug', categoryItemController.getItemBySlug)
 router.get('/:_id', categoryItemController.getCategoryItem)
 router.get('/', categoryItemController.getAllCategoryItems)
 
