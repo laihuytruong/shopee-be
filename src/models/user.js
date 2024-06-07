@@ -16,7 +16,14 @@ const UserSchema = new mongoose.Schema(
             require: true,
             unique: true,
         },
+        username: {
+            type: String,
+        },
         password: {
+            type: String,
+            require: true,
+        },
+        confirmPassword: {
             type: String,
             require: true,
         },
@@ -29,6 +36,7 @@ const UserSchema = new mongoose.Schema(
         },
         dateOfBirth: {
             type: Date,
+            default: new Date('2000-01-01'),
         },
         avatar: {
             type: String,
@@ -66,6 +74,9 @@ const UserSchema = new mongoose.Schema(
             type: String,
         },
         passwordResetExpires: {
+            type: String,
+        },
+        registerToken: {
             type: String,
         },
     },

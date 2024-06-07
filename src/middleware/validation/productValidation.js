@@ -61,11 +61,6 @@ const ratingValidation = {
 }
 
 const productDetailValidation = {
-    productDetailName: {
-        notEmpty: {
-            errorMessage: 'Product detail name cannot be empty',
-        },
-    },
     image: {},
     color: {},
     size: {},

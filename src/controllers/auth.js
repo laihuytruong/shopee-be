@@ -9,19 +9,80 @@ const {
 } = require('../utils/helpers')
 const sendEmail = require('../utils/sendEmail')
 const crypto = require('crypto')
+const makeToken = require('uniqid')
+
+const verifyEmail = async (req, res) => {
+    try {
+        const { data, dataModel } = req
+        if (dataModel) return responseData(res, 400, 1, 'Email already exists')
+        const token = makeToken()
+        const code = Math.floor(100000 + Math.random() * 900000).toString()
+        res.cookie(
+            'dataRegister',
+            { ...data, token, code },
+            {
+                httpOnly: true,
+                maxAge: 15 * 60 * 1000,
+            }
+        )
+        const dataPayload = {
+            email: data.email,
+            template: 'Register',
+            subject: 'Account registration process',
+            context: { code },
+        }
+        await sendEmail(dataPayload)
+        responseData(res, 200, 0, '', undefined, { ...data, token, code })
+    } catch (error) {
+        console.log(error)
+        responseData(res, 500, 1, error.message)
+    }
+}
 
 const register = async (req, res) => {
     try {
-        const { data, dataModel } = req
-        if (dataModel) return responseData(res, 400, 1, 'Email already exist')
+        const { data } = req
+        const username = data.email.split('@')[0]
         const dataNewUser = {
             ...data,
+            username,
             password: hashPassword(data.password),
+            dateOfBirth: new Date('01-01-2000'),
         }
-        const response = await User.create(dataNewUser)
-        if (!response) return responseData(res, 400, 1, 'Register failed')
-        responseData(res, 201, 0, 'Register successfully', null, response)
+        const newUser = await User.create(dataNewUser)
+        if (!newUser) return responseData(res, 400, 1, 'Register failed')
+
+        const user = await User.findById(newUser._id).populate(
+            'role',
+            'roleName'
+        )
+        if (!user) return responseData(res, 400, 1, 'Register failed')
+
+        const userObject = user.toObject()
+        const { password, ...response } = userObject
+
+        const payload = { _id: response._id, role: response.role.roleName }
+        const accessToken = generateAccessToken(payload, '2d')
+        const newRefreshToken = generateRefreshToken(user._id)
+
+        // Save refresh token to db
+        await User.findByIdAndUpdate(
+            user._id,
+            { refreshToken: newRefreshToken },
+            { new: true }
+        )
+
+        responseData(
+            res,
+            201,
+            0,
+            'Register successfully',
+            null,
+            response,
+            `Bearer ${accessToken}`
+        )
     } catch (error) {
+        console.log(error)
         responseData(res, 500, 1, error.message)
     }
 }
@@ -44,7 +105,7 @@ const login = async (req, res) => {
             refreshToken,
             ...response
         } = user.toObject()
-        const role = response.role
+        const role = response.role.roleName
         // Generate access token and refresh token
         const payload = { _id: user._id, role }
         const accessToken = generateAccessToken(payload, '2d')
@@ -164,6 +225,7 @@ const fortgotPassword = async (req, res) => {
         const data = {
             email,
             html,
+            subject: 'Forgot Password',
         }
         const response = await sendEmail(data)
         if (!response) return responseData(res, 400, 1, 'Send email failed')
@@ -202,6 +264,7 @@ const resetPassword = async (req, res) => {
 
 module.exports = {
     register,
+    verifyEmail,
     login,
     generateNewToken,
     logout,

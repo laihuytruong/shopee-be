@@ -4,14 +4,27 @@ const {
     responseData,
     generateSlug,
     getFileNameCloudinary,
+    paginationSortSearch,
 } = require('../utils/helpers')
 const cloudinary = require('cloudinary').v2
 
 const getAllCategories = async (req, res) => {
     try {
-        const response = await Category.find()
+        const { page = 1, limit = 10, ...query } = req.query
+        const { response, count } = await paginationSortSearch(
+            Category,
+            query,
+            page,
+            limit
+        )
+        const result = {
+            page: +page,
+            pageSize: +limit,
+            totalPage: Math.ceil(count / +limit),
+            data: response,
+        }
         if (!response) return responseData(res, 404, 1, 'No category found')
-        responseData(res, 200, 0, '', response.length, response)
+        responseData(res, 200, 0, '', count, result)
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }

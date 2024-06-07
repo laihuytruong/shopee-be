@@ -214,13 +214,10 @@ const generateSlug = (vietnameseString) => {
         .map((char) => map[char] || char)
         .join('')
 
-    // Chỉ giữ lại chữ cái, chữ số, khoảng trắng
     const noSpecialChars = noAccent.replace(/[^a-zA-Z0-9\s]/g, ' ')
 
-    // Thay thế khoảng trắng bằng dấu gạch ngang
     const withHyphens = noSpecialChars.replace(/\s+/g, '-')
 
-    // Loại bỏ dấu gạch ngang ở đầu và cuối
     const trimmedResult = withHyphens.replace(/^-+|-+$/g, '')
 
     return trimmedResult
@@ -244,7 +241,9 @@ const paginationSortSearch = async (model, query, page, limit, sort) => {
     const formattedQueries = JSON.parse(queryString)
 
     // Filtering by productName
+    console.log(query.productName)
     if (query?.productName)
+        // const regexPattern = query.productName.split('').join('.*');
         formattedQueries.productName = {
             $regex: query.productName,
             $options: 'i',
@@ -284,7 +283,16 @@ const paginationSortSearch = async (model, query, page, limit, sort) => {
         }
     }
 
-    let queryCommand = model.find(formattedQueries)
+    let queryCommand = model
+        .find(formattedQueries)
+        .populate({
+            path: 'categoryItem',
+            populate: {
+                path: 'category',
+                model: 'Category',
+            },
+        })
+        .populate('brand')
 
     // Sorting
     if (sort) {
@@ -292,16 +300,13 @@ const paginationSortSearch = async (model, query, page, limit, sort) => {
         if (sort === 'pop') {
             model.find(formattedQueries)
         } else if (sort === 'ctime') {
-            // Sắp xếp theo thời gian tạo
             sortBy = '-createdAt'
         } else if (sort === 'sales') {
-            // Lấy ra các sản phẩm có số lượng bán được lớn hơn 10
             formattedQueries.sold = {
                 $gte: 10,
             }
             queryCommand = model.find(formattedQueries)
         } else {
-            // Trường hợp còn lại, giữ nguyên sort
             sortBy = sort
                 .split(',')
                 .map((item) => item.trim())

@@ -23,12 +23,19 @@ const getAllUsers = async (req, res) => {
 const getCurrentUser = async (req, res) => {
     try {
         const { _id } = req.user
-        const response = await User.findById(_id)
+
+        if (!mongoose.Types.ObjectId.isValid(_id)) {
+            return responseData(res, 400, 1, 'Invalid user ID')
+        }
+
+        const userId = new mongoose.Types.ObjectId(_id)
+        const response = await User.findById(userId)
             .select('-refreshToken -password -role')
             .populate('cart')
             .populate('cart.product', '-createdAt -updatedAt -__v')
-        if (!response)
+        if (!response) {
             return responseData(res, 401, 1, 'Unauthorized. Please login')
+        }
         responseData(res, 200, 0, '', null, response)
     } catch (error) {
         responseData(res, 500, 1, error.message)

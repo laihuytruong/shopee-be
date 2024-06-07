@@ -88,13 +88,25 @@ const bodyValidation = {
     },
 }
 
+const emailValidation = {
+    email: {
+        notEmpty: {
+            errorMessage: 'Email cannot be empty',
+        },
+        isEmail: {
+            errorMessage: 'Invalid email format. Email format is abc@gmail.com',
+        },
+    },
+}
+
 const registerValidation = {
-    ...loginValidation,
-    ...bodyValidation,
+    ...emailValidation,
+    password: {},
 }
 
 module.exports = {
     loginValidation,
     bodyValidation,
+    emailValidation,
     registerValidation,
 }

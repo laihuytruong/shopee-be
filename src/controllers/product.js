@@ -33,12 +33,10 @@ const getAllProducts = async (req, res) => {
 
 const getOneProduct = async (req, res) => {
     try {
-        const { _id } = req.params
-        if (!mongoose.Types.ObjectId.isValid(_id))
-            return responseData(res, 400, 1, 'Invalid product id')
-        const response = await Product.findById(
-            new mongoose.Types.ObjectId(_id)
-        )
+        const { productName } = req.params
+        const response = await Product.findOne({
+            productName,
+        })
             .populate('brand', 'brandName thumbnail')
             .populate('categoryItem')
         if (!response) return responseData(res, 404, 1, 'No product found')

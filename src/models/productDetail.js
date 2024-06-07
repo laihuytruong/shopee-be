@@ -2,14 +2,6 @@ const mongoose = require('mongoose')
 
 const ProductDetailSchema = new mongoose.Schema(
     {
-        productDetailName: {
-            type: String,
-            require: true,
-            unique: true,
-        },
-        slug: {
-            type: String,
-        },
         image: {
             type: String,
         },

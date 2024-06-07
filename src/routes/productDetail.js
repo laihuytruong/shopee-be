@@ -6,8 +6,6 @@ const {
     getData,
 } = require('../middleware/middlewares')
 const {
-    productValidation,
-    ratingValidation,
     productDetailValidation,
 } = require('../middleware/validation/productValidation')
 const { checkSchema } = require('express-validator')

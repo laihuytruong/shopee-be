@@ -4,6 +4,7 @@ require('dotenv').config()
 const connectDb = require('./database/db')
 const initRoute = require('./routes')
 const cookieParser = require('cookie-parser')
+const bodyParser = require('body-parser')
 
 const app = express()
 const PORT = process.env.PORT || 8081
@@ -11,6 +12,7 @@ const PORT = process.env.PORT || 8081
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use(cookieParser())
+app.use(bodyParser.json())
 
 app.use(
     cors({

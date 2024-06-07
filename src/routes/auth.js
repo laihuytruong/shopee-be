@@ -4,12 +4,9 @@ const { checkSchema } = require('express-validator')
 const {
     registerValidation,
     loginValidation,
+    emailValidation,
 } = require('../middleware/validation/authValidation')
-const {
-    getData,
-    checkExist,
-    verifyToken,
-} = require('../middleware/middlewares')
+const { getData, checkExist } = require('../middleware/middlewares')
 const User = require('../models/user')
 
 const router = express.Router()
@@ -34,8 +31,15 @@ router.post(
     '/register',
     checkSchema(registerValidation),
     getData,
-    checkExist(User, 'email', false),
     authController.register
+)
+
+router.post(
+    '/register/verify',
+    checkSchema(emailValidation),
+    getData,
+    checkExist(User, 'email', false),
+    authController.verifyEmail
 )
 
 module.exports = router
