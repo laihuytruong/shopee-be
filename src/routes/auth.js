@@ -13,7 +13,7 @@ const router = express.Router()
 
 router.put('/reset-password/:token', authController.resetPassword)
 
-router.get('/forgot-password', authController.fortgotPassword)
+router.post('/forgot-password', authController.fortgotPassword)
 
 router.post('/refresh-token', authController.generateNewToken)
 

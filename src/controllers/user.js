@@ -3,7 +3,12 @@ const Role = require('../models/role')
 const Product = require('../models/product')
 const mongoose = require('mongoose')
 const moment = require('moment')
-const { getFileNameCloudinary, responseData } = require('../utils/helpers')
+const {
+    getFileNameCloudinary,
+    responseData,
+    hashPassword,
+    comparePassword,
+} = require('../utils/helpers')
 const cloudinary = require('cloudinary').v2
 
 const getAllUsers = async (req, res) => {
@@ -51,10 +56,18 @@ const updateUser = async (req, res) => {
         if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
             return responseData(res, 400, 1, 'Invalid ID')
         }
+        const user = await User.findById(_id)
+        if (!comparePassword(data.oldPassword, user.password)) {
+            return responseData(res, 400, 1, 'Mật khẩu cũ không chính xác')
+        }
+        if (data.newPassword !== data.confirmPassword) {
+            return responseData(res, 400, 1, 'Mật khẩu mới không trùng khớp')
+        }
         const response = await User.findByIdAndUpdate(
             _id,
             {
                 ...data,
+                password: hashPassword(data.newPassword),
                 dateOfBirth: moment(data.dateOfBirth, 'DD/MM/YYYY').toDate(),
                 avatar: req.file?.path,
             },
@@ -122,22 +135,22 @@ const deleteUser = async (req, res) => {
     }
 }
 
-const updateUserAddress = async (req, res) => {
-    try {
-        const { _id } = req.user
-        if (!req.body.address)
-            return responseData(res, 400, 1, 'Address cannot be empty')
-        const response = await User.findByIdAndUpdate(
-            _id,
-            { address: req.body.address },
-            { new: true }
-        ).select('-password -role -refreshToken')
-        if (!response) return responseData(res, 400, 1, 'Cannot update address')
-        responseData(res, 200, 0, 'Update address successfully', null, response)
-    } catch (error) {
-        responseData(res, 500, 1, error.message)
-    }
-}
+// const updateUserAddress = async (req, res) => {
+//     try {
+//         const { _id } = req.user
+//         if (!req.body.address)
+//             return responseData(res, 400, 1, 'Address cannot be empty')
+//         const response = await User.findByIdAndUpdate(
+//             _id,
+//             { address: req.body.address },
+//             { new: true }
+//         ).select('-password -role -refreshToken')
+//         if (!response) return responseData(res, 400, 1, 'Cannot update address')
+//         responseData(res, 200, 0, 'Update address successfully', null, response)
+//     } catch (error) {
+//         responseData(res, 500, 1, error.message)
+//     }
+// }
 
 const updateCart = async (req, res) => {
     try {
@@ -197,6 +210,6 @@ module.exports = {
     updateUser,
     updateUserByAdmin,
     deleteUser,
-    updateUserAddress,
+    // updateUserAddress,
     updateCart,
 }

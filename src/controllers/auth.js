@@ -14,7 +14,7 @@ const makeToken = require('uniqid')
 const verifyEmail = async (req, res) => {
     try {
         const { data, dataModel } = req
-        if (dataModel) return responseData(res, 400, 1, 'Email already exists')
+        if (dataModel) return responseData(res, 400, 1, 'Email đã tồn tại')
         const token = makeToken()
         const code = Math.floor(100000 + Math.random() * 900000).toString()
         res.cookie(
@@ -193,7 +193,7 @@ const logout = async (req, res) => {
         // Delete refresh token on db
         await User.findOneAndUpdate(
             {
-                refreshToken: cookie.refreshToken,
+                refreshToken,
             },
             { refreshToken: '' },
             { new: true }
@@ -213,23 +213,26 @@ const logout = async (req, res) => {
 
 const fortgotPassword = async (req, res) => {
     try {
-        const { email } = req.query
+        const { email } = req.body
         if (!email) return responseData(res, 400, 1, 'Email invalid')
         const user = await User.findOne({ email })
         if (!user) return responseData(res, 404, 1, 'User not found')
         const resetToken = user.createPasswordChangeToken()
+        console.log('resetToken: ', resetToken)
         await user.save()
 
-        const html = `Please click on the link below to change your password. This link will expire after 15 minutes 
-                    <a href=${process.env.URL_SERVER}/api/user/reset-password/${resetToken}>Click here</a>`
-        const data = {
-            email,
-            html,
-            subject: 'Forgot Password',
+        const dataPayload = {
+            email: email,
+            template: 'ForgotPassword',
+            subject: 'Thiết lập lại mật khẩu đăng nhập Shopee',
+            context: {
+                link: `${process.env.REQUEST_URL}/reset-password`,
+                username: user.username,
+            },
         }
-        const response = await sendEmail(data)
+        const response = await sendEmail(dataPayload)
         if (!response) return responseData(res, 400, 1, 'Send email failed')
-        responseData(res, 200, 0, '', null, response)
+        responseData(res, 200, 0, resetToken)
     } catch (error) {
         console.log(error)
         responseData(res, 500, 1, error.message)
@@ -240,12 +243,12 @@ const resetPassword = async (req, res) => {
     try {
         const { token } = req.params
         const { password } = req.body
-        if (!password || !token)
-            return responseData(res, 400, 1, 'Password or token invalid')
+        if (!token) return responseData(res, 400, 1, 'Token invalid')
         const passwordResetToken = crypto
             .createHash('sha256')
             .update(token)
             .digest('hex')
+        console.log('passwordResetToken: ', passwordResetToken)
         const user = await User.findOne({
             passwordResetToken,
             passwordResetExpires: { $gt: Date.now() },
@@ -256,7 +259,7 @@ const resetPassword = async (req, res) => {
         user.passwordChangeAt = Date.now()
         user.passwordResetExpires = undefined
         await user.save()
-        responseData(res, 200, 0, 'Reset password successfully')
+        responseData(res, 200, 0, 'Reset password successful')
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }

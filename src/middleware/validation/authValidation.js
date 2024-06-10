@@ -23,46 +23,14 @@ const loginValidation = {
 }
 
 const bodyValidation = {
-    firstName: {
-        notEmpty: {
-            errorMessage: 'First name cannot be empty',
-        },
-    },
-    lastName: {
-        notEmpty: {
-            errorMessage: 'Last name cannot be empty',
-        },
-    },
-    phoneNumber: {
-        notEmpty: {
-            errorMessage: 'Phone number cannot be empty',
-        },
-        isLength: {
-            options: {
-                min: 10,
-                max: 10,
-            },
-            errorMessage: 'Phone number must contain 10 number',
-        },
-        matches: {
-            options: /^[0-9]+$/,
-            errorMessage: 'Phone number must contain only numbers',
-        },
-    },
-    sex: {
-        notEmpty: {
-            errorMessage: 'Sex cannot be empty',
-        },
-        custom: {
-            options: (value) => {
-                const validSexValues = ['male', 'female', 'other']
-                if (!validSexValues.includes(value)) {
-                    throw new Error('Sex must be one of male, female or other')
-                }
-                return true
-            },
-        },
-    },
+    username: {},
+    oldPassword: {},
+    newPassword: {},
+    confirmPassword: {},
+    name: {},
+    phoneNumber: {},
+    sex: {},
+    address: {},
     dateOfBirth: {
         custom: {
             options: (value) => {

@@ -283,16 +283,7 @@ const paginationSortSearch = async (model, query, page, limit, sort) => {
         }
     }
 
-    let queryCommand = model
-        .find(formattedQueries)
-        .populate({
-            path: 'categoryItem',
-            populate: {
-                path: 'category',
-                model: 'Category',
-            },
-        })
-        .populate('brand')
+    let queryCommand = model.find(formattedQueries)
 
     // Sorting
     if (sort) {
