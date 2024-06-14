@@ -9,6 +9,9 @@ const BrandSchema = new mongoose.Schema(
         image: {
             type: String,
         },
+        slug: {
+            type: String,
+        },
         category: {
             type: mongoose.Types.ObjectId,
             ref: 'Category',

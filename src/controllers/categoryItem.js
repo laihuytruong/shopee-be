@@ -33,14 +33,79 @@ const getCategoryItem = async (req, res) => {
 const getItemBySlug = async (req, res) => {
     try {
         const { slug } = req.params
-        const filterCategory = await Category.find({
-            slug,
-        })
-        const response = await CategoryItem.find({
-            category: filterCategory[0]._id,
-        }).populate('category')
-        if (!response)
+
+        const pipeline = [
+            {
+                $facet: {
+                    matchedSlug: [
+                        {
+                            $match: {
+                                slug,
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: 'categories',
+                                localField: 'category',
+                                foreignField: '_id',
+                                as: 'category',
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: '$category',
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                    ],
+                    matchedCategory: [
+                        {
+                            $lookup: {
+                                from: 'categories',
+                                localField: 'category',
+                                foreignField: '_id',
+                                as: 'category',
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: '$category',
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $match: {
+                                'category.slug': slug,
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $project: {
+                    items: {
+                        $concatArrays: ['$matchedSlug', '$matchedCategory'],
+                    },
+                },
+            },
+            {
+                $unwind: {
+                    path: '$items',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $replaceRoot: {
+                    newRoot: '$items',
+                },
+            },
+        ]
+
+        const response = await CategoryItem.aggregate(pipeline)
+
+        if (!response || response.length === 0)
             return responseData(res, 404, 1, 'No category item found')
+
         responseData(res, 200, 0, '', null, response)
     } catch (error) {
         responseData(res, 500, 1, error.message)

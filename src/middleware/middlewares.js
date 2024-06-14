@@ -65,7 +65,7 @@ const verifyToken = async (req, res, next) => {
 const checkAdmin = async (req, res, next) => {
     try {
         const { role } = req.user
-        const roleData = await Role.findOne({ _id: role })
+        const roleData = await Role.findOne({ roleName: role })
         if (!roleData)
             return res.status(401).json({
                 err: 1,

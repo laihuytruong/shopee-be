@@ -53,38 +53,62 @@ const updateUser = async (req, res) => {
             params: { _id },
             data,
         } = req
+        console.log('_id: ', _id)
         if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
             return responseData(res, 400, 1, 'Invalid ID')
         }
-        const user = await User.findById(_id)
-        if (!comparePassword(data.oldPassword, user.password)) {
-            return responseData(res, 400, 1, 'Mật khẩu cũ không chính xác')
-        }
-        if (data.newPassword !== data.confirmPassword) {
-            return responseData(res, 400, 1, 'Mật khẩu mới không trùng khớp')
-        }
+        const { oldPassword, newPassword, confirmPassword, ...rest } = data
         const response = await User.findByIdAndUpdate(
-            _id,
+            new mongoose.Types.ObjectId(_id),
             {
-                ...data,
-                password: hashPassword(data.newPassword),
-                dateOfBirth: moment(data.dateOfBirth, 'DD/MM/YYYY').toDate(),
-                avatar: req.file?.path,
+                ...rest,
             },
             {
                 new: true,
             }
         ).select('-refreshToken -password -role')
-
-        if (!response && req.file) {
-            cloudinary.uploader.destroy(req.file.filename)
-            return responseData(res, 400, 1, 'Update user failed')
-        }
         responseData(res, 200, 0, '', null, response)
     } catch (error) {
         console.log(error)
         responseData(res, 500, 1, error.message)
-        if (req.file) cloudinary.uploader.destroy(req.file.filename)
+    }
+}
+
+const changePassword = async (req, res) => {
+    try {
+        const { _id } = req.params
+        if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
+            return responseData(res, 400, 1, 'Invalid ID')
+        }
+        const { oldPassword, newPassword, confirmPassword } = req.body
+        const user = await User.findById(_id)
+        if (!comparePassword(oldPassword, user.password)) {
+            return responseData(res, 400, 1, 'Mật khẩu cũ không chính xác')
+        }
+        if (newPassword !== confirmPassword) {
+            return responseData(res, 400, 1, 'Mật khẩu mới không trùng khớp')
+        }
+        if (newPassword === oldPassword) {
+            return responseData(
+                res,
+                400,
+                1,
+                'Mật khẩu mới phải khác mật khẩu cũ'
+            )
+        }
+        const response = await User.findByIdAndUpdate(
+            _id,
+            {
+                password: hashPassword(newPassword),
+            },
+            {
+                new: true,
+            }
+        ).select('-refreshToken -password -role')
+        responseData(res, 200, 0, '', null, response)
+    } catch (error) {
+        console.log(error)
+        responseData(res, 500, 1, error.message)
     }
 }
 
@@ -135,22 +159,29 @@ const deleteUser = async (req, res) => {
     }
 }
 
-// const updateUserAddress = async (req, res) => {
-//     try {
-//         const { _id } = req.user
-//         if (!req.body.address)
-//             return responseData(res, 400, 1, 'Address cannot be empty')
-//         const response = await User.findByIdAndUpdate(
-//             _id,
-//             { address: req.body.address },
-//             { new: true }
-//         ).select('-password -role -refreshToken')
-//         if (!response) return responseData(res, 400, 1, 'Cannot update address')
-//         responseData(res, 200, 0, 'Update address successfully', null, response)
-//     } catch (error) {
-//         responseData(res, 500, 1, error.message)
-//     }
-// }
+const uploadAvatar = async (req, res) => {
+    try {
+        const { _id } = req.user
+        const file = req.file
+        if (!_id || !mongoose.Types.ObjectId.isValid(_id))
+            return responseData(res, 400, 1, 'Invalid ID')
+        if (!file) return responseData(res, 400, 1, 'No image uploaded')
+        const response = await User.findByIdAndUpdate(
+            _id,
+            { avatar: file?.path },
+            { new: true }
+        ).select('-refreshToken -password -role')
+        if (!response && file) {
+            cloudinary.uploader.destroy(file.filename)
+            return responseData(res, 400, 1, 'Upload avatar failed')
+        }
+        responseData(res, 200, 0, '', null, response)
+    } catch (error) {
+        console.log(error)
+        responseData(res, 500, 1, error.message)
+        if (req.file) cloudinary.uploader.destroy(req.file.filename)
+    }
+}
 
 const updateCart = async (req, res) => {
     try {
@@ -168,7 +199,6 @@ const updateCart = async (req, res) => {
         )
 
         if (findProduct) {
-            // Nếu sản phẩm đã tồn tại trong giỏ hàng với cùng màu, cập nhật số lượng
             await User.updateOne(
                 {
                     cart: { $elemMatch: findProduct },
@@ -183,7 +213,6 @@ const updateCart = async (req, res) => {
             )
             return responseData(res, 200, 0, 'Add product to cart successfully')
         } else {
-            // Nếu sản phẩm chưa tồn tại trong giỏ hàng với cùng màu, thêm sản phẩm mới vào giỏ hàng
             await User.findByIdAndUpdate(
                 _id,
                 {
@@ -210,6 +239,7 @@ module.exports = {
     updateUser,
     updateUserByAdmin,
     deleteUser,
-    // updateUserAddress,
     updateCart,
+    uploadAvatar,
+    changePassword,
 }

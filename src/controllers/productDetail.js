@@ -37,7 +37,6 @@ const createProductDetail = async (req, res) => {
         }
         const response = await ProductDetail.create({
             ...data,
-            slug: generateSlug(data.productDetailName),
             product: product._id,
             image: req.file.path,
         })

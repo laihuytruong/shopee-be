@@ -11,7 +11,6 @@ const updateUserValidation = {
         },
     },
     ...bodyValidation,
-    avatar: {},
 }
 
 const updateUserByAdminValidation = {

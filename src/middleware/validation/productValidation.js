@@ -62,8 +62,6 @@ const ratingValidation = {
 
 const productDetailValidation = {
     image: {},
-    color: {},
-    size: {},
     price: {
         notEmpty: {
             errorMessage: 'Image cannot be empty',
@@ -82,8 +80,70 @@ const productDetailValidation = {
     },
 }
 
+const productConfigurationValidation = {
+    productDetailId: {
+        custom: {
+            options: (value) => {
+                if (!mongoose.Types.ObjectId.isValid(value)) {
+                    throw new Error('Invalid product detail id')
+                }
+                return true
+            },
+        },
+    },
+    variationOptionId: {
+        custom: {
+            options: (value) => {
+                if (!mongoose.Types.ObjectId.isValid(value)) {
+                    throw new Error('Invalid variation option id')
+                }
+                return true
+            },
+        },
+    },
+}
+
+const variationOptionValidation = {
+    variationId: {
+        custom: {
+            options: (value) => {
+                if (!mongoose.Types.ObjectId.isValid(value)) {
+                    throw new Error('Invalid variation id')
+                }
+                return true
+            },
+        },
+    },
+    value: {
+        notEmpty: {
+            errorMessage: 'Value cannot be empty',
+        },
+    },
+}
+
+const variationValidation = {
+    categoryId: {
+        custom: {
+            options: (value) => {
+                if (!mongoose.Types.ObjectId.isValid(value)) {
+                    throw new Error('Invalid category id')
+                }
+                return true
+            },
+        },
+    },
+    name: {
+        notEmpty: {
+            errorMessage: 'Name cannot be empty',
+        },
+    },
+}
+
 module.exports = {
     productValidation,
     ratingValidation,
     productDetailValidation,
+    productConfigurationValidation,
+    variationOptionValidation,
+    variationValidation,
 }

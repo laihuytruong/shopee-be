@@ -1,6 +1,10 @@
 const Brand = require('../models/brand')
 const Category = require('../models/category')
-const { responseData, getFileNameCloudinary } = require('../utils/helpers')
+const {
+    responseData,
+    getFileNameCloudinary,
+    generateSlug,
+} = require('../utils/helpers')
 const mongoose = require('mongoose')
 const cloudinary = require('cloudinary').v2
 
@@ -58,6 +62,7 @@ const createBrand = async (req, res) => {
         if (!image) {
             response = await Brand.create({
                 brandName,
+                slug: generateSlug(brandName),
                 category: new mongoose.Types.ObjectId(category),
             })
         } else {
@@ -103,6 +108,7 @@ const updateBrand = async (req, res) => {
                 _id,
                 {
                     brandName,
+                    slug: generateSlug(brandName),
                     category: new mongoose.Types.ObjectId(category),
                 },
                 { new: true }
@@ -113,6 +119,7 @@ const updateBrand = async (req, res) => {
                 {
                     brandName,
                     image,
+                    slug: generateSlug(brandName),
                     category: new mongoose.Types.ObjectId(category),
                 },
                 { new: true }

@@ -230,98 +230,176 @@ const getFileNameCloudinary = (image) => {
     return filename
 }
 
+const removeVietnameseTones = (str) => {
+    str = str.replace(/[\u0300-\u036f]/g, '')
+    str = str.replace(/[\u1E00-\u1EFF]/g, '')
+    str = str.replace(/[\u1EA0-\u1EF9]/g, '')
+
+    str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, 'a')
+    str = str.replace(/À|Á|Ạ|Ả|Ã|Â|Ầ|Ấ|Ậ|Ẩ|Ẫ|Ă|Ằ|Ắ|Ặ|Ẳ|Ẵ/g, 'A')
+    str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, 'e')
+    str = str.replace(/È|É|Ẹ|Ẻ|Ẽ|Ê|Ề|Ế|Ệ|Ể|Ễ/g, 'E')
+    str = str.replace(/ì|í|ị|ỉ|ĩ/g, 'i')
+    str = str.replace(/Ì|Í|Ị|Ỉ|Ĩ/g, 'I')
+    str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, 'o')
+    str = str.replace(/Ò|Ó|Ọ|Ỏ|Õ|Ô|Ồ|Ố|Ộ|Ổ|Ỗ|Ơ|Ờ|Ớ|Ợ|Ở|Ỡ/g, 'O')
+    str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, 'u')
+    str = str.replace(/Ù|Ú|Ụ|Ủ|Ũ|Ư|Ừ|Ứ|Ự|Ử|Ữ/g, 'U')
+    str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, 'y')
+    str = str.replace(/Ỳ|Ý|Ỵ|Ỷ|Ỹ/g, 'Y')
+    str = str.replace(/đ/g, 'd')
+    str = str.replace(/Đ/g, 'D')
+
+    return str
+}
+
 const paginationSortSearch = async (model, query, page, limit, sort) => {
     const excludeFields = ['limit', 'sort', 'page', 'fields']
     excludeFields.forEach((el) => delete query[el])
-    let queryString = JSON.stringify(query)
-    queryString = queryString.replace(
-        /\b(gte|gt|lte|lt)\b/g,
-        (matchedEl) => `$${matchedEl}`
-    )
-    const formattedQueries = JSON.parse(queryString)
 
-    // Filtering by productName
-    console.log(query.productName)
-    if (query?.productName)
-        // const regexPattern = query.productName.split('').join('.*');
-        formattedQueries.productName = {
-            $regex: query.productName,
-            $options: 'i',
-        }
+    const matchStage = []
 
-    // Filtering by price range
+    if (query?.categoryItem) {
+        matchStage.push({
+            $match: {
+                categoryItem: query.categoryItem,
+            },
+        })
+    }
+
+    if (query?.productName) {
+        const normalizedProductName = removeVietnameseTones(query.productName)
+        console.log('normalizedProductName: ', normalizedProductName)
+        matchStage.push({
+            $match: {
+                productName: { $regex: new RegExp(normalizedProductName, 'i') },
+            },
+        })
+    }
+
     if (query?.price) {
         const prices = query.price.split(',')
-        if (prices[0] !== '' && prices[1] !== '')
-            formattedQueries.price = {
-                $gte: +prices[0],
-                $lte: +prices[1],
-            }
+        const minPrice = +prices[0]
+        const maxPrice = +prices[1]
+
+        if (!isNaN(minPrice) && !isNaN(maxPrice)) {
+            matchStage.push({
+                $match: {
+                    price: { $gte: minPrice, $lte: maxPrice },
+                },
+            })
+        }
     }
 
-    // Filtering by brand
     if (query?.brand) {
-        const brand = query.brand.split(',').map((item) => {
-            return new mongoose.Types.ObjectId(item)
+        const brands = query.brand
+            .split(',')
+            .map((id) => new mongoose.Types.ObjectId(id))
+        matchStage.push({
+            $match: {
+                brand: { $in: brands },
+            },
         })
-        formattedQueries.brand = {
-            $in: brand,
-        }
     }
 
-    // Filtering by star rating
     if (query?.totalRating) {
-        const rating = +query.totalRating
-        if (rating === 5) {
-            formattedQueries.totalRating = {
-                $eq: 5,
-            }
-        } else if (rating > 1 && rating < 5) {
-            formattedQueries.totalRating = {
-                $gte: rating,
-            }
+        const totalRating = +query.totalRating
+        if (!isNaN(totalRating)) {
+            matchStage.push({
+                $match: {
+                    totalRating: { $gte: totalRating },
+                },
+            })
         }
     }
 
-    let queryCommand = model.find(formattedQueries)
+    const pipeline = [...matchStage]
 
-    // Sorting
     if (sort) {
         let sortBy
-        if (sort === 'pop') {
-            model.find(formattedQueries)
-        } else if (sort === 'ctime') {
-            sortBy = '-createdAt'
+        if (sort === 'ctime') {
+            sortBy = { createdAt: -1 }
         } else if (sort === 'sales') {
-            formattedQueries.sold = {
-                $gte: 10,
-            }
-            queryCommand = model.find(formattedQueries)
+            pipeline.push({
+                $match: {
+                    sold: { $gte: 10 },
+                },
+            })
         } else {
-            sortBy = sort
-                .split(',')
-                .map((item) => item.trim())
-                .join(' ')
+            sortBy = sort.split(',').reduce((acc, field) => {
+                const order = field.startsWith('-') ? -1 : 1
+                const cleanField = field.replace('-', '')
+                acc[cleanField] = order
+                return acc
+            }, {})
         }
         if (sortBy) {
-            queryCommand = queryCommand.sort(sortBy)
+            pipeline.push({ $sort: sortBy })
         }
     }
-    // Fields limiting
+
+    pipeline.push(
+        {
+            $lookup: {
+                from: 'categories',
+                localField: 'brand',
+                foreignField: '_id',
+                as: 'brandLookup',
+            },
+        },
+        {
+            $unwind: {
+                path: '$brandLookup',
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        {
+            $lookup: {
+                from: 'categoryitems',
+                localField: 'categoryItem',
+                foreignField: '_id',
+                as: 'categoryItem',
+            },
+        },
+        {
+            $unwind: {
+                path: '$categoryItem',
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        {
+            $lookup: {
+                from: 'categories',
+                localField: 'categoryItem.category',
+                foreignField: '_id',
+                as: 'categoryLookup',
+            },
+        },
+        {
+            $addFields: {
+                'categoryItem.category': {
+                    $arrayElemAt: ['$categoryLookup', 0],
+                },
+            },
+        }
+    )
+
     if (query.fields) {
-        const fields = query.fields
-            .split(',')
-            .map((item) => item.trim())
-            .join(' ')
-        queryCommand = queryCommand.select(fields)
+        const fields = query.fields.split(',').reduce((acc, field) => {
+            acc[field.trim()] = 1
+            return acc
+        }, {})
+        pipeline.push({ $project: fields })
     }
 
-    // Pagination
     const skip = (+page - 1) * +limit
-    queryCommand.skip(skip).limit(+limit)
+    pipeline.push({ $skip: skip }, { $limit: +limit })
 
-    const response = await queryCommand
-    const count = await model.find(formattedQueries).countDocuments()
+    const response = await model.aggregate(pipeline)
+    const countPipeline = [...matchStage, { $count: 'total' }]
+    const countResults = await model.aggregate(countPipeline)
+    const count = countResults[0]?.total || 0
+
     return { response, count }
 }
 

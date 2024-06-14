@@ -16,6 +16,12 @@ const router = express.Router()
 
 router.delete('/:_id', verifyToken, checkAdmin, userController.deleteUser)
 router.put(
+    '/upload',
+    verifyToken,
+    uploadCloud.single('avatar'),
+    userController.uploadAvatar
+)
+router.put(
     '/cart',
     verifyToken,
     checkSchema(cartUserValidation),
@@ -30,10 +36,16 @@ router.put(
     getData,
     userController.updateUserByAdmin
 )
+
+router.put(
+    '/change-password/:_id',
+    verifyToken,
+    userController.changePassword
+)
+
 router.put(
     '/current/:_id',
     verifyToken,
-    uploadCloud.single('avatar'),
     checkSchema(updateUserValidation),
     getData,
     userController.updateUser

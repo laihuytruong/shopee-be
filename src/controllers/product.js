@@ -34,13 +34,65 @@ const getAllProducts = async (req, res) => {
 const getOneProduct = async (req, res) => {
     try {
         const { productName } = req.params
-        const response = await Product.findOne({
-            productName,
-        })
-            .populate('brand', 'brandName thumbnail')
-            .populate('categoryItem')
-        if (!response) return responseData(res, 404, 1, 'No product found')
-        responseData(res, 200, 0, '', null, response)
+
+        const pipeline = [
+            {
+                $match: {
+                    productName,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: 'brand',
+                    foreignField: '_id',
+                    as: 'brandLookup',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$brandLookup',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categoryitems',
+                    localField: 'categoryItem',
+                    foreignField: '_id',
+                    as: 'categoryItem',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$categoryItem',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: 'categoryItem.category',
+                    foreignField: '_id',
+                    as: 'categoryLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'categoryItem.category': {
+                        $arrayElemAt: ['$categoryLookup', 0],
+                    },
+                },
+            },
+        ]
+
+        const response = await Product.aggregate(pipeline).exec()
+
+        if (!response || response.length === 0) {
+            return responseData(res, 404, 1, 'No product found')
+        }
+
+        responseData(res, 200, 0, '', null, response[0])
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }
@@ -231,6 +283,7 @@ const getProductsByCategory = async (req, res) => {
         const { page = 1, limit = 10, ...query } = req.query
         let searchQuery = query
         let categoryItems = await CategoryItem.find({ slug })
+
         if (categoryItems.length === 0 || !categoryItems) {
             const category = await Category.findOne({ slug })
             if (category) {
@@ -238,9 +291,9 @@ const getProductsByCategory = async (req, res) => {
                     category: category._id,
                 })
                 if (categoryItems.length > 0) {
-                    const categoryItemIds = categoryItems.map((item) => {
-                        return item._id
-                    })
+                    const categoryItemIds = categoryItems.map(
+                        (item) => item._id
+                    )
                     searchQuery = {
                         ...query,
                         categoryItem: { $in: categoryItemIds },
@@ -252,8 +305,10 @@ const getProductsByCategory = async (req, res) => {
                 return responseData(res, 404, 1, 'No category')
             }
         } else {
-            // If categoryItems found, search products within that categoryItem
-            searchQuery = { ...query, categoryItem: categoryItems[0]._id }
+            searchQuery = {
+                ...query,
+                categoryItem: { $in: [categoryItems[0]._id] },
+            }
         }
 
         const { response, count } = await paginationSortSearch(
