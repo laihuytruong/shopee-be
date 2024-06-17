@@ -120,8 +120,6 @@ const createProduct = async (req, res) => {
             categoryItem: categoryItem._id,
             brand: new mongoose.Types.ObjectId(data.brand),
         })
-        console.log(1)
-        console.log(response)
         if (!response)
             return responseData(res, 400, 1, 'Product created failed')
         responseData(res, 201, 0, '', null, response)

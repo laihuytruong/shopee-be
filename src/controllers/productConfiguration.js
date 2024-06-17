@@ -117,9 +117,136 @@ const deleteProductConfiguration = async (req, res) => {
     }
 }
 
+const getConfigurationByDetail = async (req, res) => {
+    try {
+        const { slug } = req.params
+        const pipeline = [
+            {
+                $lookup: {
+                    from: 'productdetails',
+                    localField: 'productDetailId',
+                    foreignField: '_id',
+                    as: 'productDetailId',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$productDetailId',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'products',
+                    localField: 'productDetailId.product',
+                    foreignField: '_id',
+                    as: 'productLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'productDetailId.product': {
+                        $arrayElemAt: ['$productLookup', 0],
+                    },
+                },
+            },
+            {
+                $match: {
+                    'productLookup.slug': slug,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categoryitems',
+                    localField: 'productDetailId.product.categoryItem',
+                    foreignField: '_id',
+                    as: 'categoryItemLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'productDetailId.product.categoryItem': {
+                        $arrayElemAt: ['$categoryItemLookup', 0],
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: 'productDetailId.product.categoryItem.category',
+                    foreignField: '_id',
+                    as: 'categoryLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'productDetailId.product.categoryItem.category': {
+                        $arrayElemAt: ['$categoryLookup', 0],
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: 'variationoptions',
+                    localField: 'variationOptionId',
+                    foreignField: '_id',
+                    as: 'variationOptionId',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$variationOptionId',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'variations',
+                    localField: 'variationOptionId.variationId',
+                    foreignField: '_id',
+                    as: 'variationLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'variationOptionId.variationId': {
+                        $arrayElemAt: ['$variationLookup', 0],
+                    },
+                },
+            },
+            {
+                $group: {
+                    _id: null,
+                    minPrice: { $min: '$productDetailId.price' },
+                    maxPrice: { $max: '$productDetailId.price' },
+                    configurations: { $push: '$$ROOT' },
+                },
+            },
+            {
+                $project: {
+                    productLookup: 0,
+                    variationLookup: 0,
+                    categoryItemLookup: 0,
+                    categoryLookup: 0,
+                },
+            },
+        ]
+        const response = await ProductConfiguration.aggregate(pipeline)
+        if (!response || response.length === 0) {
+            return responseData(res, 404, 1, 'No configuration found')
+        }
+        const result = response[0]
+        responseData(res, 200, 0, '', null, result)
+    } catch (error) {
+        console.log(error)
+        responseData(res, 500, 1, error.message)
+    }
+}
+
 module.exports = {
     getAllConfigurations,
     createConfiguration,
     updateConfiguration,
     deleteProductConfiguration,
+    getConfigurationByDetail,
 }

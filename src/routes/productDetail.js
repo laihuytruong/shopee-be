@@ -41,6 +41,6 @@ router.post(
     productDetailController.createProductDetail
 )
 
-router.get('/:_id', productDetailController.getProductDetail)
+router.get('/:slug', productDetailController.getProductDetail)
 
 module.exports = router

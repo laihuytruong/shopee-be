@@ -44,12 +44,15 @@ const UserSchema = new mongoose.Schema(
         },
         cart: [
             {
-                product: {
+                productDetail: {
                     type: mongoose.Types.ObjectId,
-                    ref: 'Product',
+                    ref: 'ProductDetail',
                 },
                 quantity: Number,
-                color: String,
+                variationOption: {
+                    type: mongoose.Types.ObjectId,
+                    ref: 'VariationOption',
+                }
             },
         ],
         address: {

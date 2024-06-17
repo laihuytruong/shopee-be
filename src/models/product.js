@@ -35,6 +35,7 @@ const ProductSchema = new mongoose.Schema(
             default: [
                 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQfFeFLwcGPyiM6MgD4eMSBmfKPQCQTQc-pDKQa1s8&s',
             ],
+            validate: [arrayLimit, 'Image array exceeds the limit of 5'],
         },
         rating: [
             {
@@ -63,5 +64,9 @@ const ProductSchema = new mongoose.Schema(
         timestamps: true,
     }
 )
+
+function arrayLimit(val) {
+    return val.length <= 5
+}
 
 module.exports = mongoose.model('Product', ProductSchema)

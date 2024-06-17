@@ -1,14 +1,12 @@
 const User = require('../models/user')
 const Role = require('../models/role')
-const Product = require('../models/product')
 const mongoose = require('mongoose')
-const moment = require('moment')
 const {
-    getFileNameCloudinary,
     responseData,
     hashPassword,
     comparePassword,
 } = require('../utils/helpers')
+const ProductDetail = require('../models/productDetail')
 const cloudinary = require('cloudinary').v2
 
 const getAllUsers = async (req, res) => {
@@ -34,14 +32,103 @@ const getCurrentUser = async (req, res) => {
         }
 
         const userId = new mongoose.Types.ObjectId(_id)
-        const response = await User.findById(userId)
-            .select('-refreshToken -password -role')
-            .populate('cart')
-            .populate('cart.product', '-createdAt -updatedAt -__v')
-        if (!response) {
+        const pipeline = [
+            {
+                $match: {
+                    _id: userId,
+                },
+            },
+            {
+                $unwind: '$cart',
+            },
+            {
+                $lookup: {
+                    from: 'productdetails',
+                    localField: 'cart.productDetail',
+                    foreignField: '_id',
+                    as: 'cart.productDetail',
+                },
+            },
+            {
+                $unwind: '$cart.productDetail',
+            },
+            {
+                $lookup: {
+                    from: 'products',
+                    localField: 'cart.productDetail.product',
+                    foreignField: '_id',
+                    as: 'cart.productDetail.product',
+                },
+            },
+            {
+                $unwind: '$cart.productDetail.product',
+            },
+            {
+                $lookup: {
+                    from: 'variationoptions',
+                    localField: 'cart.variationOption',
+                    foreignField: '_id',
+                    as: 'cart.variationOption',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$cart.variationOption',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'variations',
+                    localField: 'cart.variationOption.variationId',
+                    foreignField: '_id',
+                    as: 'cart.variationOption.variation',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$cart.variationOption.variation',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $sort: {
+                    updatedAt: -1,
+                },
+            },
+            {
+                $group: {
+                    _id: '$_id',
+                    user: { $first: '$$ROOT' },
+                    cart: { $push: '$cart' },
+                },
+            },
+            {
+                $addFields: {
+                    cart: { $reverseArray: '$cart' },
+                },
+            },
+            {
+                $replaceRoot: {
+                    newRoot: {
+                        $mergeObjects: ['$user', { cart: '$cart' }],
+                    },
+                },
+            },
+            {
+                $project: {
+                    'user.cart': 0,
+                },
+            },
+        ]
+
+        const response = await User.aggregate(pipeline)
+
+        if (!response || response.length === 0) {
             return responseData(res, 401, 1, 'Unauthorized. Please login')
         }
-        responseData(res, 200, 0, '', null, response)
+
+        responseData(res, 200, 0, '', null, response[0])
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }
@@ -188,46 +275,90 @@ const updateCart = async (req, res) => {
         const { _id } = req.user
         const { data } = req
 
-        const product = await Product.findById(data.pid)
-        if (!product) return responseData(res, 404, 1, 'Product not found')
+        const productDetail = await ProductDetail.findById(data.pdId)
+        if (!productDetail)
+            return responseData(res, 404, 1, 'Product detail not found')
 
         const user = await User.findById(_id).select('cart')
 
         const findProduct = user?.cart.find(
             (el) =>
-                el.product.toString() === data.pid && el.color === data.color
+                el.productDetail.toString() === data.pdId &&
+                el.variationOption.toString() === data.variationOption
         )
 
         if (findProduct) {
             await User.updateOne(
                 {
-                    cart: { $elemMatch: findProduct },
+                    _id,
+                    'cart.productDetail': data.pdId,
+                    'cart.variationOption': data.variationOption,
                 },
                 {
-                    $set: {
-                        'cart.$.quantity':
-                            findProduct.quantity + +data.quantity,
+                    $inc: {
+                        'cart.$.quantity': +data.quantity,
                     },
-                },
-                { new: true }
+                }
             )
-            return responseData(res, 200, 0, 'Add product to cart successfully')
         } else {
-            await User.findByIdAndUpdate(
-                _id,
-                {
-                    $push: {
-                        cart: {
-                            product: data.pid,
-                            quantity: +data.quantity,
-                            color: data.color,
-                        },
+            await User.findByIdAndUpdate(_id, {
+                $push: {
+                    cart: {
+                        productDetail: data.pdId,
+                        quantity: +data.quantity,
+                        variationOption: data.variationOption,
                     },
                 },
-                { new: true }
-            )
-            return responseData(res, 200, 0, 'Add product to cart successfully')
+            })
         }
+
+        const updatedUser = await User.aggregate([
+            {
+                $match: {
+                    _id: new mongoose.Types.ObjectId(_id),
+                },
+            },
+            {
+                $unwind: '$cart',
+            },
+            {
+                $lookup: {
+                    from: 'productdetails',
+                    localField: 'cart.productDetail',
+                    foreignField: '_id',
+                    as: 'cart.productDetail',
+                },
+            },
+            {
+                $unwind: '$cart.productDetail',
+            },
+            {
+                $lookup: {
+                    from: 'variationoptions',
+                    localField: 'cart.variationOption',
+                    foreignField: '_id',
+                    as: 'cart.variationOption',
+                },
+            },
+            {
+                $unwind: '$cart.variationOption',
+            },
+            {
+                $group: {
+                    _id: '$_id',
+                    cart: { $push: '$cart' },
+                },
+            },
+        ])
+
+        return responseData(
+            res,
+            200,
+            0,
+            'Add product to cart successfully',
+            null,
+            updatedUser[0]
+        )
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }

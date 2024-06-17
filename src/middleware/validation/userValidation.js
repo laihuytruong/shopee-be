@@ -41,14 +41,14 @@ const updateUserByAdminValidation = {
 }
 
 const cartUserValidation = {
-    pid: {
+    pdId: {
         notEmpty: {
-            errorMessage: 'Product id cannot be empty',
+            errorMessage: 'Product detail id cannot be empty',
         },
         custom: {
             options: (value) => {
                 if (!mongoose.Types.ObjectId.isValid(value)) {
-                    throw new Error('Invalid product id')
+                    throw new Error('Invalid product detail id')
                 }
                 return true
             },
@@ -59,11 +59,7 @@ const cartUserValidation = {
             errorMessage: 'Quantity cannot be empty',
         },
     },
-    color: {
-        notEmpty: {
-            errorMessage: 'Color cannot be empty',
-        },
-    },
+    variationOption: {},
 }
 
 module.exports = {

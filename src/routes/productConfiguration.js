@@ -39,6 +39,12 @@ router.post(
 )
 
 router.get(
+    '/:slug',
+    verifyToken,
+    productConfigurationController.getConfigurationByDetail
+)
+
+router.get(
     '/',
     verifyToken,
     checkAdmin,

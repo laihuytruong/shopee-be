@@ -10,12 +10,67 @@ const cloudinary = require('cloudinary').v2
 
 const getProductDetail = async (req, res) => {
     try {
-        const { _id } = req.params
-        if (!mongoose.Types.ObjectId.isValid(_id))
-            return responseData(res, 400, 1, 'Invalid product detail id')
-        const response = await ProductDetail.findById(
-            new mongoose.Types.ObjectId(_id)
-        ).populate('product', 'image')
+        const { slug } = req.params
+        const product = await Product.findOne({ slug })
+        const pipeline = [
+            {
+                $match: {
+                    product: product._id,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'products',
+                    localField: 'product',
+                    foreignField: '_id',
+                    as: 'product',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$product',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categoryitems',
+                    localField: 'product.categoryItem',
+                    foreignField: '_id',
+                    as: 'categoryItemLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'product.categoryItem': {
+                        $arrayElemAt: ['$categoryItemLookup', 0],
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: 'product.categoryItem.category',
+                    foreignField: '_id',
+                    as: 'categoryLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'product.categoryItem.category': {
+                        $arrayElemAt: ['$categoryLookup', 0],
+                    },
+                },
+            },
+            {
+                $project: {
+                    categoryItemLookup: 0,
+                    categoryLookup: 0,
+                },
+            },
+        ]
+        const response = await ProductDetail.aggregate(pipeline)
+        console.log('response', response)
         if (!response)
             return responseData(res, 404, 1, 'No product detail found')
         responseData(res, 200, 0, '', null, response)
@@ -30,7 +85,6 @@ const createProductDetail = async (req, res) => {
         const product = await Product.findById(
             new mongoose.Types.ObjectId(data.product)
         )
-        console.log(req.file)
         if (!req.file) return responseData(res, 400, 1, 'Image cannot be empty')
         if (!product) {
             return responseData(res, 404, 1, 'Product not found')
@@ -44,6 +98,8 @@ const createProductDetail = async (req, res) => {
             cloudinary.uploader.destroy(req.file.filename)
             return responseData(res, 400, 1, 'Product detail created failed')
         }
+        product.image.push(req.file.path)
+        await product.save()
         responseData(res, 201, 0, '', null, response)
     } catch (error) {
         console.log(error)
@@ -86,6 +142,12 @@ const updateProductDetail = async (req, res) => {
             cloudinary.uploader.destroy(req.file.filename)
             return responseData(res, 400, 1, 'No product updated')
         }
+        const imageIndex = product.image.indexOf(productDetail.image)
+        if (imageIndex > -1) {
+            product.image[imageIndex] = req.file.path
+        } else {
+            product.image.push(req.file.path)
+        }
         responseData(res, 200, 0, 'Product updated successfully')
     } catch (error) {
         console.log(error)
@@ -106,6 +168,13 @@ const deleteProductDetail = async (req, res) => {
         const response = await ProductDetail.findByIdAndDelete(_id)
         if (!response) return responseData(res, 400, 1, 'No product deleted')
         cloudinary.uploader.destroy(getFileNameCloudinary(response.image))
+        const product = await Product.findById(response.product)
+        if (product) {
+            product.image = product.image.filter(
+                (img) => img !== response.image
+            )
+            await product.save()
+        }
         responseData(
             res,
             201,
