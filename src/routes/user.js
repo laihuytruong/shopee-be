@@ -14,7 +14,8 @@ const { checkSchema } = require('express-validator')
 const uploadCloud = require('../middleware/cloudinary')
 const router = express.Router()
 
-router.delete('/:_id', verifyToken, checkAdmin, userController.deleteUser)
+router.delete('/delete-item', verifyToken, userController.deleteItemCart)
+router.delete('/delete-all', verifyToken, userController.deleteAllItemCart)
 router.put(
     '/upload',
     verifyToken,
@@ -28,20 +29,8 @@ router.put(
     getData,
     userController.updateCart
 )
-router.put(
-    '/:_id',
-    verifyToken,
-    checkAdmin,
-    checkSchema(updateUserByAdminValidation),
-    getData,
-    userController.updateUserByAdmin
-)
 
-router.put(
-    '/change-password/:_id',
-    verifyToken,
-    userController.changePassword
-)
+router.put('/change-password/:_id', verifyToken, userController.changePassword)
 
 router.put(
     '/current/:_id',
@@ -51,6 +40,16 @@ router.put(
     userController.updateUser
 )
 router.get('/current', verifyToken, userController.getCurrentUser)
+
+router.put(
+    '/:_id',
+    verifyToken,
+    checkAdmin,
+    checkSchema(updateUserByAdminValidation),
+    getData,
+    userController.updateUserByAdmin
+)
+router.delete('/:_id', verifyToken, checkAdmin, userController.deleteUser)
 router.get('/', verifyToken, checkAdmin, userController.getAllUsers)
 
 module.exports = router

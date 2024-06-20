@@ -57,16 +57,16 @@ const responseData = (
             err,
             data,
         })
-    }
-    if (accessToken)
+    } else if (accessToken)
         return res.status(statusCode).json({
             err,
             accessToken,
         })
-    return res.status(statusCode).json({
-        err,
-        msg,
-    })
+    else
+        return res.status(statusCode).json({
+            err,
+            msg,
+        })
 }
 
 const generateSlug = (vietnameseString) => {

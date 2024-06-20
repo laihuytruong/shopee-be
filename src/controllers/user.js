@@ -39,7 +39,15 @@ const getCurrentUser = async (req, res) => {
                 },
             },
             {
-                $unwind: '$cart',
+                $addFields: {
+                    cart: { $ifNull: ['$cart', []] },
+                },
+            },
+            {
+                $unwind: {
+                    path: '$cart',
+                    preserveNullAndEmptyArrays: true,
+                },
             },
             {
                 $lookup: {
@@ -50,7 +58,10 @@ const getCurrentUser = async (req, res) => {
                 },
             },
             {
-                $unwind: '$cart.productDetail',
+                $unwind: {
+                    path: '$cart.productDetail',
+                    preserveNullAndEmptyArrays: true,
+                },
             },
             {
                 $lookup: {
@@ -61,7 +72,10 @@ const getCurrentUser = async (req, res) => {
                 },
             },
             {
-                $unwind: '$cart.productDetail.product',
+                $unwind: {
+                    path: '$cart.productDetail.product',
+                    preserveNullAndEmptyArrays: true,
+                },
             },
             {
                 $lookup: {
@@ -87,7 +101,7 @@ const getCurrentUser = async (req, res) => {
             },
             {
                 $unwind: {
-                    path: '$cart.variationOption.variation',
+                    path: '$cart.variationOption.variationId',
                     preserveNullAndEmptyArrays: true,
                 },
             },
@@ -100,12 +114,30 @@ const getCurrentUser = async (req, res) => {
                 $group: {
                     _id: '$_id',
                     user: { $first: '$$ROOT' },
-                    cart: { $push: '$cart' },
+                    cart: {
+                        $push: '$cart',
+                    },
                 },
             },
             {
                 $addFields: {
-                    cart: { $reverseArray: '$cart' },
+                    cart: {
+                        $cond: {
+                            if: {
+                                $and: [
+                                    { $ne: ['$cart.productDetail', {}] },
+                                    {
+                                        $ne: [
+                                            '$cart.variationOption.variationId',
+                                            [],
+                                        ],
+                                    },
+                                ],
+                            },
+                            then: { $reverseArray: '$cart' },
+                            else: [],
+                        },
+                    },
                 },
             },
             {
@@ -123,7 +155,7 @@ const getCurrentUser = async (req, res) => {
         ]
 
         const response = await User.aggregate(pipeline)
-
+        console.log('response: ', response)
         if (!response || response.length === 0) {
             return responseData(res, 401, 1, 'Unauthorized. Please login')
         }
@@ -364,13 +396,103 @@ const updateCart = async (req, res) => {
     }
 }
 
+const deleteItemCart = async (req, res) => {
+    try {
+        const { _id } = req.user
+        const { pdId, variationOption } = req.body
+        const user = await User.findById(_id).select('cart')
+        if (!user) return responseData(res, 404, 1, 'User not found')
+        const findProduct = user.cart.find(
+            (el) =>
+                el.productDetail.toString() === pdId &&
+                el.variationOption.toString() === variationOption
+        )
+        if (!findProduct) return responseData(res, 404, 1, 'Cart empty')
+        await User.updateOne(
+            { _id },
+            {
+                $pull: {
+                    cart: {
+                        productDetail: new mongoose.Types.ObjectId(pdId),
+                        variationOption: new mongoose.Types.ObjectId(
+                            variationOption
+                        ),
+                    },
+                },
+            },
+            { new: true }
+        )
+
+        responseData(res, 200, 0, 'Delete product cart successfully')
+    } catch (error) {
+        responseData(res, 500, 1, error.message)
+    }
+}
+
+const deleteAllItemCart = async (req, res) => {
+    try {
+        const { _id } = req.user
+        const { items, checkAll } = req.body
+
+        if (!checkAll && items !== null) {
+            await User.updateOne(
+                { _id },
+                {
+                    $pull: {
+                        cart: {
+                            productDetail: {
+                                $in: items.map(
+                                    (item) =>
+                                        new mongoose.Types.ObjectId(item.pdId)
+                                ),
+                            },
+                            variationOption: {
+                                $in: items.map(
+                                    (item) =>
+                                        new mongoose.Types.ObjectId(
+                                            item.variationOption
+                                        )
+                                ),
+                            },
+                        },
+                    },
+                }
+            )
+        } else {
+            await User.updateOne(
+                { _id },
+                {
+                    $set: {
+                        cart: [],
+                    },
+                }
+            )
+        }
+
+        const updatedUser = await User.findById(_id).select('cart')
+
+        return responseData(
+            res,
+            200,
+            0,
+            'Cart cleared successfully',
+            null,
+            updatedUser
+        )
+    } catch (error) {
+        responseData(res, 500, 1, error.message)
+    }
+}
+
 module.exports = {
     getAllUsers,
     getCurrentUser,
     updateUser,
     updateUserByAdmin,
     deleteUser,
-    updateCart,
     uploadAvatar,
     changePassword,
+    updateCart,
+    deleteItemCart,
+    deleteAllItemCart,
 }

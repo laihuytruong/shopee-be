@@ -173,7 +173,7 @@ const generateNewToken = async (req, res) => {
                     '2d'
                 )
 
-                responseData(res, 201, 0, '', null, null, `Bearer ${newToken}`)
+                responseData(res, 201, 0, `Bearer ${newToken}`)
             }
         )
     } catch (error) {
