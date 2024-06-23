@@ -13,9 +13,11 @@ const blogRoute = require('./blog')
 const brandRoute = require('./brand')
 const couponRoute = require('./coupon')
 const orderRoute = require('./order')
+const stripeRoute = require('./stripe')
 const { notFound } = require('../middleware/handleError')
 
 const initRoute = (app) => {
+    app.use('/api/stripe', stripeRoute)
     app.use('/api/order', orderRoute)
     app.use('/api/coupon', couponRoute)
     app.use('/api/brand', brandRoute)

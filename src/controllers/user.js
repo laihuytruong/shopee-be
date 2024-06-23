@@ -155,7 +155,6 @@ const getCurrentUser = async (req, res) => {
         ]
 
         const response = await User.aggregate(pipeline)
-        console.log('response: ', response)
         if (!response || response.length === 0) {
             return responseData(res, 401, 1, 'Unauthorized. Please login')
         }
@@ -172,7 +171,6 @@ const updateUser = async (req, res) => {
             params: { _id },
             data,
         } = req
-        console.log('_id: ', _id)
         if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
             return responseData(res, 400, 1, 'Invalid ID')
         }

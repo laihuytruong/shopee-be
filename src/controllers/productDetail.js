@@ -124,20 +124,33 @@ const updateProductDetail = async (req, res) => {
         if (!product) {
             return responseData(res, 404, 1, 'Product not found')
         }
-
-        const response = await ProductDetail.findByIdAndUpdate(
-            _id,
-            {
-                ...data,
-                slug: generateSlug(data.productDetailName),
-                product: product._id,
-                image: req.file.path,
-            },
-            {
-                new: true,
-            }
-        )
-        console.log(response)
+        let response
+        if (req.file) {
+            response = await ProductDetail.findByIdAndUpdate(
+                _id,
+                {
+                    ...data,
+                    slug: generateSlug(data.productDetailName),
+                    product: product._id,
+                    image: req.file.path,
+                },
+                {
+                    new: true,
+                }
+            )
+        } else {
+            response = await ProductDetail.findByIdAndUpdate(
+                _id,
+                {
+                    ...data,
+                    slug: generateSlug(data.productDetailName),
+                    product: product._id,
+                },
+                {
+                    new: true,
+                }
+            )
+        }
         if (!response) {
             cloudinary.uploader.destroy(req.file.filename)
             return responseData(res, 400, 1, 'No product updated')
