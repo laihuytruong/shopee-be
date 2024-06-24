@@ -332,6 +332,29 @@ const getProductsByCategory = async (req, res) => {
     }
 }
 
+const updateQuantities = async (req, res) => {
+    const { cart } = req.body
+
+    try {
+        for (const item of cart) {
+            const product = await Product.findById(
+                item.productDetail.product._id
+            )
+            if (!product) {
+                return responseData(res, 404, 1, 'Product not found')
+            }
+
+            product.sold += item.quantity
+            await product.save()
+        }
+
+        responseData(res, 200, 0, 'Product quantities updated successfully')
+    } catch (error) {
+        console.log(error)
+        responseData(res, 500, 1, error.message)
+    }
+}
+
 module.exports = {
     getAllProducts,
     getOneProduct,
@@ -341,4 +364,5 @@ module.exports = {
     handleRating,
     uploadImagesProduct,
     getProductsByCategory,
+    updateQuantities,
 }

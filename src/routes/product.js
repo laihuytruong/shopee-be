@@ -19,6 +19,12 @@ const router = express.Router()
 router.delete('/:_id', verifyToken, checkAdmin, productController.deleteProduct)
 
 router.put(
+    '/update-quantity',
+    verifyToken,
+    productController.updateQuantities
+)
+
+router.put(
     '/ratings',
     verifyToken,
     checkSchema(ratingValidation),

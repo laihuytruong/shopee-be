@@ -22,6 +22,12 @@ router.delete(
 )
 
 router.put(
+    '/update-inventory',
+    verifyToken,
+    productDetailController.updateInventory
+)
+
+router.put(
     '/:_id',
     verifyToken,
     checkAdmin,

@@ -70,7 +70,6 @@ const getProductDetail = async (req, res) => {
             },
         ]
         const response = await ProductDetail.aggregate(pipeline)
-        console.log('response', response)
         if (!response)
             return responseData(res, 404, 1, 'No product detail found')
         responseData(res, 200, 0, '', null, response)
@@ -124,33 +123,19 @@ const updateProductDetail = async (req, res) => {
         if (!product) {
             return responseData(res, 404, 1, 'Product not found')
         }
-        let response
-        if (req.file) {
-            response = await ProductDetail.findByIdAndUpdate(
-                _id,
-                {
-                    ...data,
-                    slug: generateSlug(data.productDetailName),
-                    product: product._id,
-                    image: req.file.path,
-                },
-                {
-                    new: true,
-                }
-            )
-        } else {
-            response = await ProductDetail.findByIdAndUpdate(
-                _id,
-                {
-                    ...data,
-                    slug: generateSlug(data.productDetailName),
-                    product: product._id,
-                },
-                {
-                    new: true,
-                }
-            )
-        }
+        const response = await ProductDetail.findByIdAndUpdate(
+            _id,
+            {
+                ...data,
+                slug: generateSlug(data.productDetailName),
+                product: product._id,
+                image: req.file.path,
+            },
+            {
+                new: true,
+            }
+        )
+
         if (!response) {
             cloudinary.uploader.destroy(req.file.filename)
             return responseData(res, 400, 1, 'No product updated')
@@ -199,27 +184,29 @@ const deleteProductDetail = async (req, res) => {
     }
 }
 
-const uploadImagesProduct = async (req, res) => {
+const updateInventory = async (req, res) => {
+    const { cart } = req.body
+
     try {
-        const { _id } = req.params
-        if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
-            return responseData(res, 400, 1, 'Invalid ID')
+        for (const item of cart) {
+            const productDetail = await ProductDetail.findById(
+                item.productDetail._id
+            )
+            if (!productDetail) {
+                return responseData(res, 404, 1, 'Product detail not found')
+            }
+
+            productDetail.inventory -= item.quantity
+            await productDetail.save()
         }
-        console.log(req.files)
-        if (!req.files) return responseData(res, 400, 1, 'No image upload')
-        const response = await Product.findByIdAndUpdate(
-            _id,
-            {
-                $push: {
-                    image: { $each: req.files.map((image) => image.path) },
-                },
-            },
-            { new: true }
+        responseData(
+            res,
+            200,
+            0,
+            'ProductDetail quantities updated successfully'
         )
-        console.log(response)
-        if (!response) return responseData(res, 400, 1, 'Upload image failed')
-        responseData(res, 200, 1, 'Upload image successfully', null, response)
     } catch (error) {
+        console.error(error)
         responseData(res, 500, 1, error.message)
     }
 }
@@ -229,4 +216,5 @@ module.exports = {
     createProductDetail,
     updateProductDetail,
     deleteProductDetail,
+    updateInventory,
 }

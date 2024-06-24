@@ -1,15 +1,23 @@
 const { responseData } = require('../utils/helpers')
 const stripe = require('stripe')(process.env.STRIPE_KEY)
+const Order = require('../models/order')
 
 const createCheckoutSession = async (req, res) => {
     try {
         const { products } = req.body
-        console.log('req.body: ', req.body.products)
+        const { _id } = req.user
+
+        const order = new Order({
+            products,
+            status: 'Waiting Delivering',
+            orderBy: _id,
+        })
+        await order.save()
 
         const lineItems = products.map((product) => ({
             price_data: {
                 currency: 'vnd',
-                unit_amount: product.productDetail.price,
+                unit_amount: product.productDetail.price + 15000,
                 product_data: {
                     name: product.productDetail.product.productName,
                     images: [product.productDetail.image],

@@ -96,7 +96,7 @@ const getCurrentUser = async (req, res) => {
                     from: 'variations',
                     localField: 'cart.variationOption.variationId',
                     foreignField: '_id',
-                    as: 'cart.variationOption.variation',
+                    as: 'cart.variationOption.variationId',
                 },
             },
             {

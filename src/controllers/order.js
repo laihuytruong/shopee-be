@@ -32,7 +32,196 @@ const getAllUserOrders = async (req, res) => {
 const getOrder = async (req, res) => {
     try {
         const { _id } = req.user
-        const response = await Order.find({ orderBy: _id }).populate('coupon')
+        const pipeline = [
+            {
+                $match: {
+                    orderBy: new mongoose.Types.ObjectId(_id),
+                },
+            },
+            {
+                $unwind: '$products',
+            },
+            {
+                $lookup: {
+                    from: 'productdetails',
+                    localField: 'products.productDetail',
+                    foreignField: '_id',
+                    as: 'productDetailLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'products.productDetail': {
+                        $arrayElemAt: ['$productDetailLookup', 0],
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: 'products',
+                    localField: 'products.productDetail.product',
+                    foreignField: '_id',
+                    as: 'productLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'products.productDetail.product': {
+                        $arrayElemAt: ['$productLookup', 0],
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: 'variationoptions',
+                    localField: 'products.variationOption',
+                    foreignField: '_id',
+                    as: 'variationOptionLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'products.variationOption': {
+                        $arrayElemAt: ['$variationOptionLookup', 0],
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: 'variations',
+                    localField: 'products.variationOption.variationId',
+                    foreignField: '_id',
+                    as: 'variationLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'products.variationOption.variationId': {
+                        $arrayElemAt: ['$variationLookup', 0],
+                    },
+                },
+            },
+            {
+                $group: {
+                    _id: '$_id',
+                    products: { $push: '$products' },
+                    status: { $first: '$status' },
+                    orderBy: { $first: '$orderBy' },
+                },
+            },
+            {
+                $project: {
+                    productDetailLookup: 0,
+                    productLookup: 0,
+                    variationOptionLookup: 0,
+                    variationLookup: 0,
+                },
+            },
+        ]
+
+        const response = await Order.aggregate(pipeline)
+        if (!response || response.length === 0)
+            return responseData(res, 400, 1, 'No order found')
+        responseData(res, 200, 0, '', null, response)
+    } catch (error) {
+        responseData(res, 500, 1, error.message)
+    }
+}
+
+const getOrderByStatus = async (req, res) => {
+    try {
+        const { status } = req.params
+        const { _id } = req.user
+
+        const pipeline = [
+            {
+                $match: {
+                    orderBy: new mongoose.Types.ObjectId(_id),
+                    status,
+                },
+            },
+            {
+                $unwind: '$products',
+            },
+            {
+                $lookup: {
+                    from: 'productdetails',
+                    localField: 'products.productDetail',
+                    foreignField: '_id',
+                    as: 'productDetailLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'products.productDetail': {
+                        $arrayElemAt: ['$productDetailLookup', 0],
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: 'products',
+                    localField: 'products.productDetail.product',
+                    foreignField: '_id',
+                    as: 'productLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'products.productDetail.product': {
+                        $arrayElemAt: ['$productLookup', 0],
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: 'variationoptions',
+                    localField: 'products.variationOption',
+                    foreignField: '_id',
+                    as: 'variationOptionLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'products.variationOption': {
+                        $arrayElemAt: ['$variationOptionLookup', 0],
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: 'variations',
+                    localField: 'products.variationOption.variationId',
+                    foreignField: '_id',
+                    as: 'variationLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'products.variationOption.variationId': {
+                        $arrayElemAt: ['$variationLookup', 0],
+                    },
+                },
+            },
+            {
+                $group: {
+                    _id: '$_id',
+                    products: { $push: '$products' },
+                    status: { $first: '$status' },
+                    orderBy: { $first: '$orderBy' },
+                },
+            },
+            {
+                $project: {
+                    productDetailLookup: 0,
+                    productLookup: 0,
+                    variationOptionLookup: 0,
+                    variationLookup: 0,
+                },
+            },
+        ]
+
+        const response = await Order.aggregate(pipeline)
         if (!response) return responseData(res, 400, 1, 'No order found')
         responseData(res, 200, 0, '', null, response)
     } catch (error) {
@@ -43,10 +232,6 @@ const getOrder = async (req, res) => {
 const createOrder = async (req, res) => {
     try {
         const { _id } = req.user
-        const { coupon } = req.body
-
-        if (!_id || !mongoose.Types.ObjectId.isValid(coupon))
-            return responseData(res, 400, 1, 'Invalid coupon id')
 
         const userCart = await User.findById(_id)
             .select('cart')
@@ -65,32 +250,12 @@ const createOrder = async (req, res) => {
             (sum, el) => el.product.price * el.quantity + sum,
             0
         )
-        if (coupon) {
-            const couponData = await Coupon.findById(coupon)
-
-            if (!couponData) {
-                return responseData(res, 404, 1, 'No coupon found')
-            }
-
-            if (Date.now() > couponData.expireDate) {
-                return responseData(res, 400, 1, 'Coupon expired')
-            }
-
-            // Apply discount and round to nearest thousand
-            total =
-                Math.round((total * (1 - couponData.discount / 100)) / 1000) *
-                1000
-        }
 
         // Create order
         const orderData = {
             products,
             total,
             orderBy: _id,
-        }
-
-        if (coupon) {
-            orderData.coupon = coupon
         }
 
         const response = await Order.create(orderData)
@@ -133,4 +298,5 @@ module.exports = {
     getOrder,
     createOrder,
     updateStatus,
+    getOrderByStatus,
 }

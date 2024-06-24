@@ -4,29 +4,29 @@ const OrderSchema = new mongoose.Schema(
     {
         products: [
             {
-                product: {
+                productDetail: {
                     type: mongoose.Types.ObjectId,
-                    ref: 'Product',
+                    ref: 'ProductDetail',
                 },
                 quantity: {
                     type: Number,
                 },
-                color: {
-                    type: String,
+                variationOption: {
+                    type: mongoose.Types.ObjectId,
+                    ref: 'VariationOption',
                 },
             },
         ],
         status: {
             type: String,
             default: 'Pending',
-            enum: ['Cancel', 'Pending', 'Done', 'Delivering'],
-        },
-        total: {
-            type: Number,
-        },
-        coupon: {
-            type: mongoose.Types.ObjectId,
-            ref: 'Coupon',
+            enum: [
+                'Cancel',
+                'Pending',
+                'Done',
+                'Delivering',
+                'Waiting Delivering',
+            ],
         },
         orderBy: {
             type: mongoose.Types.ObjectId,
