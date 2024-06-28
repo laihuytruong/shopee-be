@@ -1,7 +1,6 @@
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const { default: mongoose } = require('mongoose')
-const categoryItem = require('../models/categoryItem')
 
 const hashPassword = (password) => {
     const salt = bcrypt.genSaltSync(10)
@@ -28,18 +27,20 @@ const responseData = (
     res,
     statusCode,
     err,
-    msg = '',
-    count,
-    data = null,
-    accessToken
+    msg,
+    accessToken,
+    data,
+    page = 1,
+    pageSize = 5,
+    totalCount = 0
 ) => {
+    console.log({
+        page,
+        pageSize,
+        totalCount,
+        totalPage: Math.ceil(totalCount / +pageSize),
+    })
     if (data) {
-        if (count)
-            return res.status(statusCode).json({
-                err,
-                count,
-                data,
-            })
         if (msg && accessToken)
             return res.status(statusCode).json({
                 err,
@@ -51,10 +52,18 @@ const responseData = (
             return res.status(statusCode).json({
                 err,
                 msg,
+                page,
+                pageSize,
+                totalCount,
+                totalPage: Math.ceil(totalCount / +pageSize),
                 data,
             })
         return res.status(statusCode).json({
             err,
+            page,
+            pageSize,
+            totalCount,
+            totalPage: Math.ceil(totalCount / +pageSize),
             data,
         })
     } else if (accessToken)
@@ -232,7 +241,6 @@ const getFileNameCloudinary = (image) => {
 
 const removeVietnameseTones = (str) => {
     str = str.replace(/[\u0300-\u036f]/g, '')
-    str = str.replace(/[\u1E00-\u1EFF]/g, '')
     str = str.replace(/[\u1EA0-\u1EF9]/g, '')
 
     str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, 'a')
@@ -268,7 +276,9 @@ const paginationSortSearch = async (model, query, page, limit, sort) => {
     }
 
     if (query?.productName) {
-        const normalizedProductName = removeVietnameseTones(query.productName)
+        const normalizedProductName = removeVietnameseTones(
+            query.productName.toLowerCase()
+        )
         console.log('normalizedProductName: ', normalizedProductName)
         matchStage.push({
             $match: {
@@ -341,7 +351,7 @@ const paginationSortSearch = async (model, query, page, limit, sort) => {
     pipeline.push(
         {
             $lookup: {
-                from: 'categories',
+                from: 'brands',
                 localField: 'brand',
                 foreignField: '_id',
                 as: 'brandLookup',
@@ -403,6 +413,48 @@ const paginationSortSearch = async (model, query, page, limit, sort) => {
     return { response, count }
 }
 
+// Hàm tìm kiếm theo column name
+// const searchByColumn = async (
+//     collection,
+//     columnName,
+//     searchString,
+//     page,
+//     pageSize
+// ) => {
+//     const skip = (page - 1) * pageSize
+//     const normalizedSearchString = normalizeString(searchString)
+
+//     const pipeline = [
+//         {
+//             $match: {
+//                 [columnName]: {
+//                     $regex: normalizedSearchString,
+//                     $options: 'i',
+//                 },
+//             },
+//         },
+//         { $skip: skip },
+//         { $limit: pageSize },
+//     ]
+
+//     const results = await collection.aggregate(pipeline)
+//     const totalDocuments = await collection.countDocuments({
+//         [columnName]: {
+//             $regex: normalizedSearchString,
+//             $options: 'i',
+//         },
+//     })
+//     const totalPages = Math.ceil(totalDocuments / pageSize)
+
+//     return {
+//         results,
+//         page,
+//         pageSize,
+//         totalPages,
+//         totalDocuments,
+//     }
+// }
+
 module.exports = {
     hashPassword,
     comparePassword,
@@ -412,4 +464,5 @@ module.exports = {
     responseData,
     getFileNameCloudinary,
     paginationSortSearch,
+    // searchByColumn,
 }

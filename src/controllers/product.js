@@ -8,6 +8,7 @@ const {
     responseData,
     paginationSortSearch,
 } = require('../utils/helpers')
+const removeAccents = require('remove-accents')
 
 const getAllProducts = async (req, res) => {
     try {
@@ -355,6 +356,95 @@ const updateQuantities = async (req, res) => {
     }
 }
 
+const search = async (req, res) => {
+    try {
+        const { keyword, page, pageSize } = req.query
+        const normalizedSearch = removeAccents(keyword).toLowerCase()
+        const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10)
+        const limit = parseInt(pageSize, 10)
+
+        const pipeline = [
+            {
+                $lookup: {
+                    from: 'brands',
+                    localField: 'brand',
+                    foreignField: '_id',
+                    as: 'brand',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$brand',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categoryitems',
+                    localField: 'categoryItem',
+                    foreignField: '_id',
+                    as: 'categoryItem',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$categoryItem',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: 'categoryItem.category',
+                    foreignField: '_id',
+                    as: 'categoryLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'categoryItem.category': {
+                        $arrayElemAt: ['$categoryLookup', 0],
+                    },
+                },
+            },
+            { $skip: skip ? skip : 0 },
+            { $limit: limit ? +limit : 5 },
+            {
+                $project: {
+                    categoryLookup: 0,
+                },
+            },
+        ]
+
+        const products = await Product.aggregate(pipeline)
+        const totalProducts = await Product.countDocuments()
+        const filteredProducts = products.filter(
+            (product) =>
+                removeAccents(product.productName)
+                    .toLowerCase()
+                    .includes(normalizedSearch) ||
+                removeAccents(product.categoryItem.categoryItemName)
+                    .toLowerCase()
+                    .includes(normalizedSearch)
+        )
+
+        responseData(
+            res,
+            200,
+            0,
+            '',
+            '',
+            filteredProducts,
+            page,
+            pageSize,
+            totalProducts
+        )
+    } catch (error) {
+        console.log(error)
+        responseData(res, 500, 1, error.message)
+    }
+}
+
 module.exports = {
     getAllProducts,
     getOneProduct,
@@ -365,4 +455,5 @@ module.exports = {
     uploadImagesProduct,
     getProductsByCategory,
     updateQuantities,
+    search,
 }

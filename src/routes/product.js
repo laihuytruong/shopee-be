@@ -18,11 +18,7 @@ const router = express.Router()
 
 router.delete('/:_id', verifyToken, checkAdmin, productController.deleteProduct)
 
-router.put(
-    '/update-quantity',
-    verifyToken,
-    productController.updateQuantities
-)
+router.put('/update-quantity', verifyToken, productController.updateQuantities)
 
 router.put(
     '/ratings',
@@ -57,8 +53,13 @@ router.post(
     getData,
     productController.createProduct
 )
+router.get('/search', productController.search)
 
-router.get('/category/:slug', productController.getProductsByCategory)
+router.get(
+    '/category/:slug',
+    verifyToken,
+    productController.getProductsByCategory
+)
 router.get('/:productName', productController.getOneProduct)
 router.get('/', productController.getAllProducts)
 
