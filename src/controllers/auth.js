@@ -127,9 +127,8 @@ const login = async (req, res) => {
             200,
             0,
             'Login successfully',
-            null,
-            response,
-            `Bearer ${accessToken}`
+            `Bearer ${accessToken}`,
+            response
         )
     } catch (error) {
         responseData(res, 500, 1, error.message)

@@ -12,21 +12,77 @@ const removeAccents = require('remove-accents')
 
 const getAllProducts = async (req, res) => {
     try {
-        const { page = 1, limit = 10, ...query } = req.query
-        const { response, count } = await paginationSortSearch(
-            Product,
-            query,
+        const { page, pageSize } = req.query
+        const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10)
+        const limit = parseInt(pageSize, 10)
+
+        const pipeline = [
+            {
+                $lookup: {
+                    from: 'brands',
+                    localField: 'brand',
+                    foreignField: '_id',
+                    as: 'brand',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$brand',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categoryitems',
+                    localField: 'categoryItem',
+                    foreignField: '_id',
+                    as: 'categoryItem',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$categoryItem',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: 'categoryItem.category',
+                    foreignField: '_id',
+                    as: 'categoryLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'categoryItem.category': {
+                        $arrayElemAt: ['$categoryLookup', 0],
+                    },
+                },
+            },
+            { $skip: skip ? skip : 0 },
+            { $limit: limit ? +limit : 10 },
+            {
+                $project: {
+                    categoryLookup: 0,
+                },
+            },
+        ]
+
+        const products = await Product.aggregate(pipeline)
+        const totalProducts = await Product.countDocuments()
+        if (!products) return responseData(res, 404, 1, 'No product found')
+        responseData(
+            res,
+            200,
+            0,
+            '',
+            '',
+            products,
             page,
-            limit
+            pageSize,
+            totalProducts
         )
-        const result = {
-            page: +page,
-            pageSize: +limit,
-            totalPage: Math.ceil(count / +limit),
-            data: response,
-        }
-        if (!response) return responseData(res, 404, 1, 'No product found')
-        responseData(res, 200, 0, '', count, result)
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }
@@ -279,9 +335,11 @@ const uploadImagesProduct = async (req, res) => {
 const getProductsByCategory = async (req, res) => {
     try {
         const { slug } = req.params
-        const { page = 1, limit = 10, ...query } = req.query
+        const { page, pageSize, ...query } = req.query
         let searchQuery = query
         let categoryItems = await CategoryItem.find({ slug })
+        const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10)
+        const limit = parseInt(pageSize, 10)
 
         if (categoryItems.length === 0 || !categoryItems) {
             const category = await Category.findOne({ slug })
@@ -310,23 +368,90 @@ const getProductsByCategory = async (req, res) => {
             }
         }
 
-        const { response, count } = await paginationSortSearch(
-            Product,
-            searchQuery,
-            page,
-            limit,
-            req.query.sort
-        )
-        const result = {
-            page: +page,
-            pageSize: +limit,
-            totalPage: Math.ceil(count / +limit),
-            data: response,
-        }
-        if (!response) {
+        const pipeline = [
+            {
+                $match: searchQuery,
+            },
+            {
+                $lookup: {
+                    from: 'brands',
+                    localField: 'brand',
+                    foreignField: '_id',
+                    as: 'brand',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$brand',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categoryitems',
+                    localField: 'categoryItem',
+                    foreignField: '_id',
+                    as: 'categoryItem',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$categoryItem',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: 'categoryItem.category',
+                    foreignField: '_id',
+                    as: 'categoryLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'categoryItem.category': {
+                        $arrayElemAt: ['$categoryLookup', 0],
+                    },
+                },
+            },
+            { $skip: skip ? skip : 0 },
+            { $limit: limit ? +limit : 10 },
+            {
+                $project: {
+                    categoryLookup: 0,
+                },
+            },
+        ]
+
+        const countPipeline = [
+            {
+                $match: searchQuery,
+            },
+            {
+                $count: 'total',
+            },
+        ]
+
+        const products = await Product.aggregate(pipeline)
+        const totalCountResult = await Product.aggregate(countPipeline)
+        const totalProducts = totalCountResult[0]
+            ? totalCountResult[0].total
+            : 0
+        if (!products) {
             return responseData(res, 404, 1, 'No product found')
         }
-        responseData(res, 200, 0, '', count, result)
+        responseData(
+            res,
+            200,
+            0,
+            '',
+            '',
+            products,
+            page,
+            pageSize,
+            totalProducts
+        )
     } catch (error) {
         console.log(error)
         responseData(res, 500, 1, error.message)
@@ -418,14 +543,16 @@ const search = async (req, res) => {
 
         const products = await Product.aggregate(pipeline)
         const totalProducts = await Product.countDocuments()
-        const filteredProducts = products.filter(
-            (product) =>
-                removeAccents(product.productName)
-                    .toLowerCase()
-                    .includes(normalizedSearch) ||
-                removeAccents(product.categoryItem.categoryItemName)
-                    .toLowerCase()
-                    .includes(normalizedSearch)
+        const categoryItems = await CategoryItem.find()
+        const filteredProducts = products.filter((product) =>
+            removeAccents(product.productName)
+                .toLowerCase()
+                .includes(normalizedSearch)
+        )
+        const filterCategoryItems = categoryItems.filter((categoryItem) =>
+            removeAccents(categoryItem.categoryItemName)
+                .toLowerCase()
+                .includes(normalizedSearch)
         )
 
         responseData(
@@ -434,7 +561,9 @@ const search = async (req, res) => {
             0,
             '',
             '',
-            filteredProducts,
+            filterCategoryItems.length > 0
+                ? filterCategoryItems
+                : filteredProducts,
             page,
             pageSize,
             totalProducts

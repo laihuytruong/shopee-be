@@ -30,17 +30,22 @@ const responseData = (
     msg,
     accessToken,
     data,
-    page = 1,
-    pageSize = 5,
-    totalCount = 0
+    page,
+    pageSize,
+    totalCount
 ) => {
-    console.log({
-        page,
-        pageSize,
-        totalCount,
-        totalPage: Math.ceil(totalCount / +pageSize),
-    })
     if (data) {
+        if (page && pageSize && totalCount) {
+            const totalPage = Math.ceil(totalCount / pageSize)
+            return res.status(statusCode).json({
+                err,
+                page: +page,
+                pageSize: +pageSize,
+                totalCount,
+                totalPage,
+                data,
+            })
+        }
         if (msg && accessToken)
             return res.status(statusCode).json({
                 err,
@@ -52,18 +57,10 @@ const responseData = (
             return res.status(statusCode).json({
                 err,
                 msg,
-                page,
-                pageSize,
-                totalCount,
-                totalPage: Math.ceil(totalCount / +pageSize),
                 data,
             })
         return res.status(statusCode).json({
             err,
-            page,
-            pageSize,
-            totalCount,
-            totalPage: Math.ceil(totalCount / +pageSize),
             data,
         })
     } else if (accessToken)
@@ -279,7 +276,6 @@ const paginationSortSearch = async (model, query, page, limit, sort) => {
         const normalizedProductName = removeVietnameseTones(
             query.productName.toLowerCase()
         )
-        console.log('normalizedProductName: ', normalizedProductName)
         matchStage.push({
             $match: {
                 productName: { $regex: new RegExp(normalizedProductName, 'i') },
@@ -413,6 +409,55 @@ const paginationSortSearch = async (model, query, page, limit, sort) => {
     return { response, count }
 }
 
+const pipelineCustom = (match, lookups, unwindPaths, addFields) => {
+    const pipeline = []
+
+    if (match) {
+        pipeline.push({
+            $match: match,
+        })
+    }
+
+    if (lookups) {
+        for (const lookup of lookups) {
+            pipeline.push({
+                $lookup: lookup,
+            })
+        }
+    }
+
+    if (unwindPaths) {
+        for (const unwindPath of unwindPaths) {
+            pipeline.push({
+                $unwind: {
+                    path: unwindPath,
+                    preserveNullAndEmptyArrays: true,
+                },
+            })
+        }
+    }
+
+    if (addFields) {
+        for (const field in addFields) {
+            if (addFields.hasOwnProperty(field)) {
+                pipeline.push({
+                    $addFields: {
+                        [field]: addFields[field],
+                    },
+                })
+            }
+        }
+    }
+
+    if (project) {
+        pipeline.push({
+            $project: project,
+        })
+    }
+
+    return pipeline
+}
+
 // Hàm tìm kiếm theo column name
 // const searchByColumn = async (
 //     collection,
@@ -465,4 +510,5 @@ module.exports = {
     getFileNameCloudinary,
     paginationSortSearch,
     // searchByColumn,
+    pipelineCustom,
 }

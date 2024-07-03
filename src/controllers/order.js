@@ -6,24 +6,106 @@ const { responseData } = require('../utils/helpers')
 
 const getAllUserOrders = async (req, res) => {
     try {
-        const { _id } = req.user
-        const queries = { ...req.query }
-        const excludeFields = ['limit', 'page']
-        excludeFields.forEach((el) => delete queries[el])
+        const { page, pageSize } = req.query
+        const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10)
+        const limit = parseInt(pageSize, 10)
 
-        let queryString = JSON.stringify(queries)
-        const formattedQueries = JSON.parse(queryString)
-        let queryCommand = Order.find(formattedQueries)
-
-        const page = +req.query.page || 1
-        const limit = +req.query.limit || 6
-        const skip = (page - 1) * limit
-        queryCommand.skip(skip).limit(limit)
-
-        const response = await queryCommand
-        const count = await Order.find(formattedQueries).countDocuments()
+        const pipeline = [
+            [
+                {
+                    $unwind: '$products',
+                },
+                {
+                    $lookup: {
+                        from: 'productDetails',
+                        localField: 'products.productDetail',
+                        foreignField: '_id',
+                        as: 'productDetailLookup',
+                    },
+                },
+                {
+                    $addFields: {
+                        'products.productDetail': {
+                            $arrayElemAt: ['$productDetailLookup', 0],
+                        },
+                    },
+                },
+                {
+                    $lookup: {
+                        from: 'products',
+                        localField: 'productDetailLookup.product',
+                        foreignField: '_id',
+                        as: 'productLookup',
+                    },
+                },
+                {
+                    $addFields: {
+                        'productDetailLookup.product': {
+                            $arrayElemAt: ['$productLookup', 0],
+                        },
+                    },
+                },
+                {
+                    $lookup: {
+                        from: 'variationOptions',
+                        localField: 'products.variationOption',
+                        foreignField: '_id',
+                        as: 'variationOptionLookup',
+                    },
+                },
+                {
+                    $addFields: {
+                        'products.variationOption': {
+                            $arrayElemAt: ['$variationOptionLookup', 0],
+                        },
+                    },
+                },
+                {
+                    $lookup: {
+                        from: 'variations',
+                        localField: 'variationOptionLookup.variation',
+                        foreignField: '_id',
+                        as: 'variationLookup',
+                    },
+                },
+                {
+                    $addFields: {
+                        'variationOptionLookup.variation': {
+                            $arrayElemAt: ['$variationLookup', 0],
+                        },
+                    },
+                },
+                {
+                    $group: {
+                        _id: '$_id',
+                        orderBy: { $first: '$orderBy' },
+                        status: { $first: '$status' },
+                        products: {
+                            $push: {
+                                productDetail: '$productLookup',
+                                quantity: '$products.quantity',
+                                variationOption: '$variationLookup',
+                            },
+                        },
+                    },
+                },
+                { $skip: skip ? skip : 0 },
+                { $limit: limit ? +limit : 5 },
+                {
+                    $project: {
+                        productDetailLookup: 0,
+                        productLookup: 0,
+                        variationOptionLookup: 0,
+                        variationLookup: 0,
+                    },
+                },
+            ],
+        ]
+        const orders = await Order.aggregate(pipeline)
+        const totalOrders = await Order.countDocuments()
+        console.log('1')
         if (!response) return responseData(res, 404, 1, 'No order found')
-        responseData(res, 200, 0, '', count, response)
+        responseData(res, 200, 0, '', '', orders, page, pageSize, totalOrders)
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }
@@ -32,14 +114,15 @@ const getAllUserOrders = async (req, res) => {
 const getOrder = async (req, res) => {
     try {
         const { _id } = req.user
+        const { page, pageSize } = req.query
+        const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10)
+        const limit = parseInt(pageSize, 10)
+
         const pipeline = [
             {
                 $match: {
                     orderBy: new mongoose.Types.ObjectId(_id),
                 },
-            },
-            {
-                $unwind: '$products',
             },
             {
                 $lookup: {
@@ -102,13 +185,10 @@ const getOrder = async (req, res) => {
                 },
             },
             {
-                $group: {
-                    _id: '$_id',
-                    products: { $push: '$products' },
-                    status: { $first: '$status' },
-                    orderBy: { $first: '$orderBy' },
-                },
+                $sort: { createdAt: -1 },
             },
+            { $skip: skip ? skip : 0 },
+            { $limit: limit ? +limit : 5 },
             {
                 $project: {
                     productDetailLookup: 0,
@@ -119,10 +199,26 @@ const getOrder = async (req, res) => {
             },
         ]
 
-        const response = await Order.aggregate(pipeline)
-        if (!response || response.length === 0)
+        const orders = await Order.aggregate(pipeline)
+        console.log(
+            'orders',
+            orders.map((order) => order._id)
+        )
+
+        const totalOrders = await Order.countDocuments()
+        if (!orders || orders.length === 0)
             return responseData(res, 400, 1, 'No order found')
-        responseData(res, 200, 0, '', null, response)
+        responseData(
+            res,
+            200,
+            0,
+            '',
+            '',
+            orders,
+            page ? page : 1,
+            pageSize ? pageSize : 5,
+            totalOrders
+        )
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }
@@ -132,6 +228,9 @@ const getOrderByStatus = async (req, res) => {
     try {
         const { status } = req.params
         const { _id } = req.user
+        const { page, pageSize } = req.query
+        const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 5)
+        const limit = parseInt(pageSize, 5)
 
         const pipeline = [
             {
@@ -139,9 +238,6 @@ const getOrderByStatus = async (req, res) => {
                     orderBy: new mongoose.Types.ObjectId(_id),
                     status,
                 },
-            },
-            {
-                $unwind: '$products',
             },
             {
                 $lookup: {
@@ -204,13 +300,10 @@ const getOrderByStatus = async (req, res) => {
                 },
             },
             {
-                $group: {
-                    _id: '$_id',
-                    products: { $push: '$products' },
-                    status: { $first: '$status' },
-                    orderBy: { $first: '$orderBy' },
-                },
+                $sort: { createdAt: -1 },
             },
+            { $skip: skip ? skip : 0 },
+            { $limit: limit ? +limit : 5 },
             {
                 $project: {
                     productDetailLookup: 0,
@@ -221,9 +314,21 @@ const getOrderByStatus = async (req, res) => {
             },
         ]
 
-        const response = await Order.aggregate(pipeline)
-        if (!response) return responseData(res, 400, 1, 'No order found')
-        responseData(res, 200, 0, '', null, response)
+        const orders = await Order.aggregate(pipeline)
+        const totalOrders = await Order.countDocuments()
+        if (!orders || orders.length === 0)
+            return responseData(res, 400, 1, 'No order found')
+        responseData(
+            res,
+            200,
+            0,
+            '',
+            '',
+            orders,
+            page ? page : 1,
+            pageSize ? pageSize : 5,
+            totalOrders
+        )
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }
