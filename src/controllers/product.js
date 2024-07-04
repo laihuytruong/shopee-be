@@ -6,7 +6,7 @@ const Brand = require('../models/brand')
 const {
     generateSlug,
     responseData,
-    paginationSortSearch,
+    performSearch,
 } = require('../utils/helpers')
 const removeAccents = require('remove-accents')
 
@@ -488,82 +488,203 @@ const search = async (req, res) => {
         const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10)
         const limit = parseInt(pageSize, 10)
 
-        const pipeline = [
-            {
-                $lookup: {
-                    from: 'brands',
-                    localField: 'brand',
-                    foreignField: '_id',
-                    as: 'brand',
-                },
-            },
-            {
-                $unwind: {
-                    path: '$brand',
-                    preserveNullAndEmptyArrays: true,
-                },
-            },
-            {
-                $lookup: {
-                    from: 'categoryitems',
-                    localField: 'categoryItem',
-                    foreignField: '_id',
-                    as: 'categoryItem',
-                },
-            },
-            {
-                $unwind: {
-                    path: '$categoryItem',
-                    preserveNullAndEmptyArrays: true,
-                },
-            },
-            {
-                $lookup: {
-                    from: 'categories',
-                    localField: 'categoryItem.category',
-                    foreignField: '_id',
-                    as: 'categoryLookup',
-                },
-            },
-            {
-                $addFields: {
-                    'categoryItem.category': {
-                        $arrayElemAt: ['$categoryLookup', 0],
+        if (keyword.length > 0) {
+            const productPipeline = [
+                {
+                    $lookup: {
+                        from: 'brands',
+                        localField: 'brand',
+                        foreignField: '_id',
+                        as: 'brand',
                     },
                 },
-            },
-            { $skip: skip ? skip : 0 },
-            { $limit: limit ? +limit : 5 },
-            {
-                $project: {
-                    categoryLookup: 0,
+                {
+                    $unwind: {
+                        path: '$brand',
+                        preserveNullAndEmptyArrays: true,
+                    },
                 },
-            },
-        ]
+                {
+                    $lookup: {
+                        from: 'categoryitems',
+                        localField: 'categoryItem',
+                        foreignField: '_id',
+                        as: 'categoryItem',
+                    },
+                },
+                {
+                    $unwind: {
+                        path: '$categoryItem',
+                        preserveNullAndEmptyArrays: true,
+                    },
+                },
+                {
+                    $lookup: {
+                        from: 'categories',
+                        localField: 'categoryItem.category',
+                        foreignField: '_id',
+                        as: 'categoryLookup',
+                    },
+                },
+                {
+                    $addFields: {
+                        'categoryItem.category': {
+                            $arrayElemAt: ['$categoryLookup', 0],
+                        },
+                    },
+                },
+                { $skip: skip ? skip : 0 },
+                { $limit: limit ? +limit : 5 },
+                {
+                    $project: {
+                        categoryLookup: 0,
+                    },
+                },
+            ]
 
-        const products = await Product.aggregate(pipeline)
-        const totalProducts = await Product.countDocuments()
-        const categoryItems = await CategoryItem.find()
-        const filteredProducts = products.filter((product) =>
-            removeAccents(product.productName)
-                .toLowerCase()
-                .includes(normalizedSearch)
-        )
-        const filterCategoryItems = categoryItems.filter((categoryItem) =>
-            removeAccents(categoryItem.categoryItemName)
-                .toLowerCase()
-                .includes(normalizedSearch)
-        )
+            const {
+                filteredItems: filteredProducts,
+                totalItems: totalProducts,
+            } = await performSearch(
+                Product,
+                productPipeline,
+                'productName',
+                normalizedSearch,
+                skip,
+                limit
+            )
 
-        responseData(
+            const categoryItemPipeline = [
+                {
+                    $lookup: {
+                        from: 'categories',
+                        localField: 'category',
+                        foreignField: '_id',
+                        as: 'category',
+                    },
+                },
+                {
+                    $unwind: {
+                        path: '$category',
+                        preserveNullAndEmptyArrays: true,
+                    },
+                },
+            ]
+
+            const {
+                filteredItems: filterCategoryItems,
+                totalItems: totalCategoryItems,
+            } = await performSearch(
+                CategoryItem,
+                categoryItemPipeline,
+                'categoryItemName',
+                normalizedSearch,
+                skip,
+                limit
+            )
+
+            const results =
+                filterCategoryItems.length > 0
+                    ? filterCategoryItems
+                    : filteredProducts
+            const totalResults =
+                filterCategoryItems.length > 0
+                    ? totalCategoryItems
+                    : totalProducts
+
+            return responseData(
+                res,
+                200,
+                0,
+                '',
+                '',
+                results,
+                page,
+                pageSize,
+                totalResults
+            )
+        }
+        responseData(res, 500, 1, 'No product found')
+    } catch (error) {
+        console.log(error)
+        responseData(res, 500, 1, error.message)
+    }
+}
+
+const filter = async (req, res) => {
+    try {
+        const { page, pageSize, ...query } = req.query
+        const { productData } = req.body
+        const copyProductData = productData
+        let products = [...copyProductData]
+        let searchQuery = query
+        if (productData) {
+            if (searchQuery?.price) {
+                const prices = searchQuery.price.split(',')
+                const minPrice = +prices[0]
+                const maxPrice = +prices[1]
+
+                if (!isNaN(minPrice) && !isNaN(maxPrice)) {
+                    products = products.filter(
+                        (product) =>
+                            product.price >= minPrice &&
+                            product.price <= maxPrice
+                    )
+                }
+            }
+
+            if (searchQuery?.brand) {
+                const brands = searchQuery.brand.split(',')
+                products = products.filter((product) =>
+                    brands.includes(product.brand._id.toString())
+                )
+            }
+
+            if (searchQuery?.totalRating) {
+                const totalRating = +searchQuery.totalRating
+                if (!isNaN(totalRating)) {
+                    products = products.filter(
+                        (product) => product.totalRating >= totalRating
+                    )
+                }
+            }
+
+            if (searchQuery?.sort) {
+                let sortBy
+                if (searchQuery.sort === 'ctime') {
+                    sortBy = { createdAt: -1 }
+                    products.sort(() => -1)
+                } else if (searchQuery.sort === 'sales') {
+                    products = products.filter((product) => product.sold >= 10)
+                } else {
+                    sortBy = searchQuery.sort.split(',')
+                    products.sort((a, b) => {
+                        for (const field of sortBy) {
+                            const order = field.startsWith('-') ? -1 : 1
+                            const cleanField = field.replace('-', '')
+                            if (a[cleanField] > b[cleanField]) return order
+                            if (a[cleanField] < b[cleanField]) return -order
+                        }
+                        return 0
+                    })
+                }
+            }
+        }
+        const totalProducts =
+            products && products.length > 0
+                ? products.length
+                : productData.length
+        return responseData(
             res,
             200,
             0,
             '',
             '',
-            filterCategoryItems.length > 0
-                ? filterCategoryItems
-                : filteredProducts,
+            products.length > 0
+                ? products
+                : Object.keys(searchQuery).length === 0
+                ? productData
+                : [],
             page,
             pageSize,
             totalProducts
@@ -585,4 +706,5 @@ module.exports = {
     getProductsByCategory,
     updateQuantities,
     search,
+    filter,
 }

@@ -35,7 +35,9 @@ const getBrand = async (req, res) => {
         if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
             return responseData(res, 400, 1, 'Invalid ID')
         }
-        const response = await Brand.findById(_id).populate('category')
+        const response = await Brand.find({
+            category: new mongoose.Types.ObjectId(_id),
+        }).populate('category')
         if (!response) return responseData(res, 400, 1, 'Cannot get brand')
         responseData(res, 200, 0, '', null, response)
     } catch (error) {

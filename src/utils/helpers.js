@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const { default: mongoose } = require('mongoose')
+const removeAccents = require('remove-accents')
 
 const hashPassword = (password) => {
     const salt = bcrypt.genSaltSync(10)
@@ -409,96 +410,34 @@ const paginationSortSearch = async (model, query, page, limit, sort) => {
     return { response, count }
 }
 
-const pipelineCustom = (match, lookups, unwindPaths, addFields) => {
-    const pipeline = []
-
-    if (match) {
-        pipeline.push({
-            $match: match,
-        })
-    }
-
-    if (lookups) {
-        for (const lookup of lookups) {
-            pipeline.push({
-                $lookup: lookup,
-            })
-        }
-    }
-
-    if (unwindPaths) {
-        for (const unwindPath of unwindPaths) {
-            pipeline.push({
-                $unwind: {
-                    path: unwindPath,
-                    preserveNullAndEmptyArrays: true,
-                },
-            })
-        }
-    }
-
-    if (addFields) {
-        for (const field in addFields) {
-            if (addFields.hasOwnProperty(field)) {
-                pipeline.push({
-                    $addFields: {
-                        [field]: addFields[field],
-                    },
-                })
-            }
-        }
-    }
-
-    if (project) {
-        pipeline.push({
-            $project: project,
-        })
-    }
-
-    return pipeline
+const filterItems = (items, fieldName, normalizedSearch) => {
+    const normalizedSearchArr = normalizedSearch.toLowerCase().split(' ')
+    return items.filter((item) => {
+        const fieldValueArr = removeAccents(item[fieldName])
+            .toLowerCase()
+            .split(' ')
+        return normalizedSearchArr.every((word) =>
+            fieldValueArr.some((fieldWord) => fieldWord.includes(word))
+        )
+    })
 }
 
-// Hàm tìm kiếm theo column name
-// const searchByColumn = async (
-//     collection,
-//     columnName,
-//     searchString,
-//     page,
-//     pageSize
-// ) => {
-//     const skip = (page - 1) * pageSize
-//     const normalizedSearchString = normalizeString(searchString)
-
-//     const pipeline = [
-//         {
-//             $match: {
-//                 [columnName]: {
-//                     $regex: normalizedSearchString,
-//                     $options: 'i',
-//                 },
-//             },
-//         },
-//         { $skip: skip },
-//         { $limit: pageSize },
-//     ]
-
-//     const results = await collection.aggregate(pipeline)
-//     const totalDocuments = await collection.countDocuments({
-//         [columnName]: {
-//             $regex: normalizedSearchString,
-//             $options: 'i',
-//         },
-//     })
-//     const totalPages = Math.ceil(totalDocuments / pageSize)
-
-//     return {
-//         results,
-//         page,
-//         pageSize,
-//         totalPages,
-//         totalDocuments,
-//     }
-// }
+const performSearch = async (
+    model,
+    pipeline,
+    fieldName,
+    normalizedSearch,
+    skip,
+    limit
+) => {
+    const items = await model
+        .aggregate(pipeline)
+        .skip(skip ? +skip : 0)
+        .limit(limit ? +limit : 5)
+    const filteredItems = filterItems(items, fieldName, normalizedSearch)
+    const totalItems = await model.countDocuments()
+    return { filteredItems, totalItems }
+}
 
 module.exports = {
     hashPassword,
@@ -509,6 +448,5 @@ module.exports = {
     responseData,
     getFileNameCloudinary,
     paginationSortSearch,
-    // searchByColumn,
-    pipelineCustom,
+    performSearch,
 }

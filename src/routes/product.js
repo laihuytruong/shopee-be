@@ -53,6 +53,7 @@ router.post(
     getData,
     productController.createProduct
 )
+router.post('/filter', verifyToken, productController.filter)
 router.get('/search', productController.search)
 
 router.get(

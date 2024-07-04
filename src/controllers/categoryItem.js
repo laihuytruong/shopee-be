@@ -108,6 +108,7 @@ const getItemBySlug = async (req, res) => {
 
         responseData(res, 200, 0, '', null, response)
     } catch (error) {
+        console.log(error)
         responseData(res, 500, 1, error.message)
     }
 }
