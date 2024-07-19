@@ -5,10 +5,48 @@ const { responseData, generateSlug } = require('../utils/helpers')
 
 const getAllCategoryItems = async (req, res) => {
     try {
-        const response = await CategoryItem.find().populate('category')
-        if (!response)
-            return responseData(res, 404, 1, 'No category item found')
-        responseData(res, 200, 0, '', response.length, response)
+        const { page, pageSize } = req.query
+        const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10)
+        const limit = parseInt(pageSize, 10)
+
+        const pipeline = [
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: 'category',
+                    foreignField: '_id',
+                    as: 'categoryLookup',
+                },
+            },
+            {
+                $addFields: {
+                    category: {
+                        $arrayElemAt: ['$categoryLookup', 0],
+                    },
+                },
+            },
+            { $skip: skip ? skip : 0 },
+            { $limit: limit ? +limit : 5 },
+            {
+                $project: {
+                    categoryLookup: 0,
+                },
+            },
+        ]
+        const categoryItems = await CategoryItem.aggregate(pipeline)
+        const totalCategoryItems = await CategoryItem.countDocuments()
+        if (!categoryItems) return responseData(res, 404, 1, 'No category item found')
+        responseData(
+            res,
+            200,
+            0,
+            '',
+            '',
+            categoryItems,
+            page,
+            pageSize,
+            totalCategoryItems
+        )
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }

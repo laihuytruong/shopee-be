@@ -34,8 +34,7 @@ router.put(
     '/:_id',
     verifyToken,
     checkAdmin,
-    checkSchema(categoryValidation),
-    getData,
+    uploadCloud.single('thumbnail'),
     categoryController.updateCategory
 )
 
@@ -43,9 +42,7 @@ router.post(
     '/',
     verifyToken,
     checkAdmin,
-    checkSchema(categoryValidation),
-    getData,
-    checkExist(Category, 'categoryName', false),
+    uploadCloud.single('thumbnail'),
     categoryController.createCategory
 )
 

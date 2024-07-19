@@ -36,8 +36,12 @@ const responseData = (
     totalCount
 ) => {
     if (data) {
-        if (page && pageSize && totalCount) {
-            const totalPage = Math.ceil(totalCount / pageSize)
+        if (
+            page !== undefined &&
+            pageSize !== undefined &&
+            totalCount !== undefined
+        ) {
+            const totalPage = Math.ceil(+totalCount / pageSize)
             return res.status(statusCode).json({
                 err,
                 page: +page,

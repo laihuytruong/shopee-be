@@ -46,9 +46,6 @@ const ProductSchema = new mongoose.Schema(
                     type: mongoose.Types.ObjectId,
                     ref: 'User',
                 },
-                comment: {
-                    type: String,
-                },
             },
         ],
         totalRating: {

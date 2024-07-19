@@ -253,7 +253,7 @@ const deleteProduct = async (req, res) => {
 const handleRating = async (req, res) => {
     try {
         const {
-            data: { star, comment, pid },
+            data: { star, pid },
             user: { _id },
         } = req
         const productRating = await Product.findById(pid)
@@ -270,7 +270,6 @@ const handleRating = async (req, res) => {
                 {
                     $set: {
                         'rating.$.star': star,
-                        'rating.$.comment': comment,
                     },
                 },
                 { new: true }
@@ -282,7 +281,6 @@ const handleRating = async (req, res) => {
                     $push: {
                         rating: {
                             star,
-                            comment,
                             votedBy: _id,
                         },
                     },

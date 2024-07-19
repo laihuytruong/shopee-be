@@ -103,7 +103,6 @@ const getAllUserOrders = async (req, res) => {
         ]
         const orders = await Order.aggregate(pipeline)
         const totalOrders = await Order.countDocuments()
-        console.log('1')
         if (!response) return responseData(res, 404, 1, 'No order found')
         responseData(res, 200, 0, '', '', orders, page, pageSize, totalOrders)
     } catch (error) {

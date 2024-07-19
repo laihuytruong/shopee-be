@@ -217,7 +217,6 @@ const fortgotPassword = async (req, res) => {
         const user = await User.findOne({ email })
         if (!user) return responseData(res, 404, 1, 'User not found')
         const resetToken = user.createPasswordChangeToken()
-        console.log('resetToken: ', resetToken)
         await user.save()
 
         const dataPayload = {

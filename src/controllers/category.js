@@ -10,21 +10,28 @@ const cloudinary = require('cloudinary').v2
 
 const getAllCategories = async (req, res) => {
     try {
-        const { page = 1, limit = 10, ...query } = req.query
-        const { response, count } = await paginationSortSearch(
-            Category,
-            query,
+        const { page, pageSize } = req.query
+        const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10)
+        const limit = parseInt(pageSize, 10)
+        const pipeline = [
+            { $skip: skip ? skip : 0 },
+            { $limit: limit ? +limit : 5 },
+        ]
+        const categories = await Category.aggregate(pipeline)
+        const totalCategories = await Category.countDocuments()
+        if (!categories && categories.length === 0)
+            return responseData(res, 404, 1, 'No category found')
+        responseData(
+            res,
+            200,
+            0,
+            '',
+            '',
+            categories,
             page,
-            limit
+            pageSize,
+            totalCategories
         )
-        const result = {
-            page: +page,
-            pageSize: +limit,
-            totalPage: Math.ceil(count / +limit),
-            data: response,
-        }
-        if (!response) return responseData(res, 404, 1, 'No category found')
-        responseData(res, 200, 0, '', count, result)
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }
@@ -47,16 +54,13 @@ const getOneCategory = async (req, res) => {
 
 const createCategory = async (req, res) => {
     try {
-        const {
-            dataModel,
-            data: { categoryName },
-        } = req
-        if (dataModel) {
-            return responseData(res, 400, 1, 'Category already exist')
-        }
+        const { categoryName } = req.body
+        const thumbnail = req.file.path
+
         const response = await Category.create({
             categoryName,
             slug: generateSlug(categoryName),
+            thumbnail,
         })
         if (!response) {
             return responseData(res, 400, 1, 'Create category failed')
@@ -78,22 +82,39 @@ const updateCategory = async (req, res) => {
     try {
         const {
             params: { _id },
-            data: { categoryName },
+            body: { categoryName },
         } = req
+        const thumbnail = req.file
         if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
             return responseData(res, 400, 1, 'Invalid ID')
         }
 
-        const response = await Category.findByIdAndUpdate(
-            _id,
-            {
-                categoryName,
-                slug: generateSlug(categoryName),
-            },
-            {
-                new: true,
-            }
-        )
+        let response
+
+        if (!thumbnail) {
+            response = await Category.findByIdAndUpdate(
+                _id,
+                {
+                    categoryName,
+                    slug: generateSlug(categoryName),
+                },
+                {
+                    new: true,
+                }
+            )
+        } else {
+            response = await Category.findByIdAndUpdate(
+                _id,
+                {
+                    categoryName,
+                    slug: generateSlug(categoryName),
+                    thumbnail: thumbnail.path,
+                },
+                {
+                    new: true,
+                }
+            )
+        }
 
         if (!response) {
             return responseData(res, 400, 1, 'No category updated')
@@ -110,14 +131,9 @@ const deleteCategory = async (req, res) => {
         if (!_id || !mongoose.Types.ObjectId.isValid(_id))
             return responseData(res, 400, 1, 'Invalid ID')
         const response = await Category.findByIdAndDelete(_id)
-        if (!response) return responseData(res, 400, 1, 'No user deleted')
+        if (!response) return responseData(res, 400, 1, 'No category deleted')
         cloudinary.uploader.destroy(getFileNameCloudinary(response.thumbnail))
-        responseData(
-            res,
-            200,
-            0,
-            `Category with categoryName ${response.categoryName} deleted`
-        )
+        responseData(res, 200, 0, `Deleted category successfully`)
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }
