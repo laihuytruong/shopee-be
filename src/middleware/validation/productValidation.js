@@ -16,11 +16,6 @@ const productValidation = {
             },
         },
     },
-    price: {
-        notEmpty: {
-            errorMessage: 'Price cannot be empty',
-        },
-    },
     categoryItem: {
         custom: {
             options: (value) => {

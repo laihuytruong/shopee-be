@@ -179,7 +179,7 @@ const createProduct = async (req, res) => {
         })
         if (!response)
             return responseData(res, 400, 1, 'Product created failed')
-        responseData(res, 201, 0, '', null, response)
+        responseData(res, 201, 0, 'Create product successfully', '', response)
     } catch (error) {
         console.log(error)
         responseData(res, 500, 1, error.message)

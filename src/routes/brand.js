@@ -12,31 +12,11 @@ const router = express.Router()
 
 router.delete('/:_id', verifyToken, checkAdmin, brandController.deleteBrand)
 
-router.put(
-    '/upload/:_id',
-    verifyToken,
-    checkAdmin,
-    uploadCloud.single('image'),
-    brandController.uploadImageBrand
-)
+router.put('/:_id', verifyToken, checkAdmin, brandController.updateBrand)
 
-router.put(
-    '/:_id',
-    verifyToken,
-    checkAdmin,
-    checkExist(Brand, 'brandName', false),
-    brandController.updateBrand
-)
+router.post('/', verifyToken, checkAdmin, brandController.createBrand)
 
-router.post(
-    '/',
-    verifyToken,
-    checkAdmin,
-    checkExist(Brand, 'brandName', false),
-    brandController.createBrand
-)
-
-router.get('/filter/:slug', brandController.getBrandSBySlug)
+router.get('/filter/:slug', brandController.getBrandsBySlug)
 router.get('/:_id', brandController.getBrand)
 router.get('/', brandController.getAllBrands)
 

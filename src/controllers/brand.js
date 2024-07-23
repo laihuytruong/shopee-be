@@ -10,20 +10,38 @@ const cloudinary = require('cloudinary').v2
 
 const getAllBrands = async (req, res) => {
     try {
-        const queries = { ...req.query }
-        const excludeFields = ['limit', 'page']
-        excludeFields.forEach((el) => delete queries[el])
+        const { page, pageSize } = req.query
+        const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10)
+        const limit = parseInt(pageSize, 10)
 
-        let queryCommand = Brand.find().populate('category')
-
-        const page = +req.query.page || 1
-        const limit = +req.query.limit || 5
-        const skip = (page - 1) * limit
-        queryCommand.skip(skip).limit(limit)
-
-        const response = await queryCommand
-        if (!response) return responseData(res, 400, 1, 'Cannot get brands')
-        responseData(res, 200, 0, '', response.length, response)
+        const pipeline = [
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: 'category',
+                    foreignField: '_id',
+                    as: 'categoryLookup',
+                },
+            },
+            {
+                $addFields: {
+                    category: {
+                        $arrayElemAt: ['$categoryLookup', 0],
+                    },
+                },
+            },
+            { $skip: skip ? skip : 0 },
+            { $limit: limit ? +limit : 5 },
+            {
+                $project: {
+                    categoryLookup: 0,
+                },
+            },
+        ]
+        const brands = await Brand.aggregate(pipeline)
+        const totalBrands = await Brand.countDocuments()
+        if (!brands) return responseData(res, 404, 1, 'No brand found')
+        responseData(res, 200, 0, '', '', brands, page, pageSize, totalBrands)
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }
@@ -47,37 +65,24 @@ const getBrand = async (req, res) => {
 
 const createBrand = async (req, res) => {
     try {
-        const {
-            body: { brandName, category, image },
-            dataModel,
-        } = req
+        const { brandName, category } = req.body
         if (!brandName) {
             return responseData(res, 400, 1, 'Brand name cannot be empty')
         }
-        if (dataModel) return responseData(res, 400, 1, 'Brand already exist')
         const categoryData = await Category.findById(
             new mongoose.Types.ObjectId(category)
         )
         if (!categoryData)
             return responseData(res, 404, 1, 'Category does not exist')
-        let response
-        if (!image) {
-            response = await Brand.create({
-                brandName,
-                slug: generateSlug(brandName),
-                category: new mongoose.Types.ObjectId(category),
-            })
-        } else {
-            response = await Brand.create({
-                brandName,
-                image,
-                category: new mongoose.Types.ObjectId(category),
-            })
-        }
+        const response = await Brand.create({
+            brandName,
+            slug: generateSlug(brandName),
+            category: new mongoose.Types.ObjectId(category),
+        })
         if (!response) {
             return responseData(res, 400, 1, 'Create brand failed')
         }
-        responseData(res, 201, 0, 'Create brand successfully', null, response)
+        responseData(res, 201, 0, 'Create brand successfully')
     } catch (error) {
         console.log(error)
         responseData(res, 500, 1, error.message)
@@ -87,46 +92,26 @@ const createBrand = async (req, res) => {
 const updateBrand = async (req, res) => {
     try {
         const {
-            body: { brandName, category, image },
+            body: { brandName, category },
             params: { _id },
-            dataModel,
         } = req
         if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
             return responseData(res, 400, 1, 'Invalid ID')
         }
-        if (!brandName) {
-            return responseData(res, 400, 1, 'Brand name cannot be empty')
-        }
-
-        if (dataModel) return responseData(res, 400, 1, 'Brand already exist')
         const categoryData = await Category.findById(
             new mongoose.Types.ObjectId(category)
         )
         if (!categoryData)
             return responseData(res, 404, 1, 'Category does not exist')
-        let response
-        if (!image) {
-            response = await Brand.findByIdAndUpdate(
-                _id,
-                {
-                    brandName,
-                    slug: generateSlug(brandName),
-                    category: new mongoose.Types.ObjectId(category),
-                },
-                { new: true }
-            )
-        } else {
-            response = await Brand.findByIdAndUpdate(
-                _id,
-                {
-                    brandName,
-                    image,
-                    slug: generateSlug(brandName),
-                    category: new mongoose.Types.ObjectId(category),
-                },
-                { new: true }
-            )
-        }
+        const response = await Brand.findByIdAndUpdate(
+            _id,
+            {
+                brandName,
+                slug: generateSlug(brandName),
+                category: new mongoose.Types.ObjectId(category),
+            },
+            { new: true }
+        )
         if (!response) {
             return responseData(res, 400, 1, 'No brand updated')
         }
@@ -146,40 +131,13 @@ const deleteBrand = async (req, res) => {
         }
         const response = await Brand.findByIdAndDelete(_id)
         if (!response) return responseData(res, 400, 1, 'Delete brand failed')
-        cloudinary.uploader.destroy(getFileNameCloudinary(response.image))
-        responseData(res, 200, 0, 'Delete brand successfully', null, null)
+        responseData(res, 200, 0, 'Delete brand successfully')
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }
 }
 
-const uploadImageBrand = async (req, res) => {
-    try {
-        const { _id } = req.params
-        if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
-            return responseData(res, 400, 1, 'Invalid ID')
-        }
-        if (!req.file) return responseData(res, 400, 1, 'No image upload')
-        const response = await Brand.findByIdAndUpdate(
-            _id,
-            {
-                image: req.file.path,
-            },
-            { new: true }
-        )
-        console.log(response)
-        if (!response) {
-            cloudinary.uploader.destroy(req.file.filename)
-            return responseData(res, 400, 1, 'Upload image failed')
-        }
-        responseData(res, 200, 0, `Upload image successful`)
-    } catch (error) {
-        responseData(res, 500, 1, error.message)
-        if (req.file) cloudinary.uploader.destroy(req.file.filename)
-    }
-}
-
-const getBrandSBySlug = async (req, res) => {
+const getBrandsBySlug = async (req, res) => {
     try {
         const { slug } = req.params
         const filterCategory = await Category.find({
@@ -202,6 +160,5 @@ module.exports = {
     createBrand,
     updateBrand,
     deleteBrand,
-    uploadImageBrand,
-    getBrandSBySlug,
+    getBrandsBySlug,
 }

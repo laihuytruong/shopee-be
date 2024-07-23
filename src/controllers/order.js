@@ -11,100 +11,113 @@ const getAllUserOrders = async (req, res) => {
         const limit = parseInt(pageSize, 10)
 
         const pipeline = [
-            [
-                {
-                    $unwind: '$products',
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'orderBy',
+                    foreignField: '_id',
+                    as: 'userLookup',
                 },
-                {
-                    $lookup: {
-                        from: 'productDetails',
-                        localField: 'products.productDetail',
-                        foreignField: '_id',
-                        as: 'productDetailLookup',
+            },
+            {
+                $addFields: {
+                    orderBy: {
+                        $arrayElemAt: ['$userLookup', 0],
                     },
                 },
-                {
-                    $addFields: {
-                        'products.productDetail': {
-                            $arrayElemAt: ['$productDetailLookup', 0],
-                        },
+            },
+            {
+                $lookup: {
+                    from: 'productdetails',
+                    localField: 'products.productDetail',
+                    foreignField: '_id',
+                    as: 'productDetailLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'products.productDetail': {
+                        $arrayElemAt: ['$productDetailLookup', 0],
                     },
                 },
-                {
-                    $lookup: {
-                        from: 'products',
-                        localField: 'productDetailLookup.product',
-                        foreignField: '_id',
-                        as: 'productLookup',
+            },
+            {
+                $lookup: {
+                    from: 'products',
+                    localField: 'products.productDetail.product',
+                    foreignField: '_id',
+                    as: 'productLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'products.productDetail.product': {
+                        $arrayElemAt: ['$productLookup', 0],
                     },
                 },
-                {
-                    $addFields: {
-                        'productDetailLookup.product': {
-                            $arrayElemAt: ['$productLookup', 0],
-                        },
+            },
+            {
+                $lookup: {
+                    from: 'variationoptions',
+                    localField: 'products.variationOption',
+                    foreignField: '_id',
+                    as: 'variationOptionLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'products.variationOption': {
+                        $arrayElemAt: ['$variationOptionLookup', 0],
                     },
                 },
-                {
-                    $lookup: {
-                        from: 'variationOptions',
-                        localField: 'products.variationOption',
-                        foreignField: '_id',
-                        as: 'variationOptionLookup',
+            },
+            {
+                $lookup: {
+                    from: 'variations',
+                    localField: 'products.variationOption.variationId',
+                    foreignField: '_id',
+                    as: 'variationLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'products.variationOption.variationId': {
+                        $arrayElemAt: ['$variationLookup', 0],
                     },
                 },
-                {
-                    $addFields: {
-                        'products.variationOption': {
-                            $arrayElemAt: ['$variationOptionLookup', 0],
-                        },
-                    },
+            },
+            {
+                $sort: { createdAt: -1 },
+            },
+            { $skip: skip ? skip : 0 },
+            { $limit: limit ? +limit : 5 },
+            {
+                $project: {
+                    productDetailLookup: 0,
+                    productLookup: 0,
+                    variationOptionLookup: 0,
+                    variationLookup: 0,
+                    userLookup: 0,
                 },
-                {
-                    $lookup: {
-                        from: 'variations',
-                        localField: 'variationOptionLookup.variation',
-                        foreignField: '_id',
-                        as: 'variationLookup',
-                    },
-                },
-                {
-                    $addFields: {
-                        'variationOptionLookup.variation': {
-                            $arrayElemAt: ['$variationLookup', 0],
-                        },
-                    },
-                },
-                {
-                    $group: {
-                        _id: '$_id',
-                        orderBy: { $first: '$orderBy' },
-                        status: { $first: '$status' },
-                        products: {
-                            $push: {
-                                productDetail: '$productLookup',
-                                quantity: '$products.quantity',
-                                variationOption: '$variationLookup',
-                            },
-                        },
-                    },
-                },
-                { $skip: skip ? skip : 0 },
-                { $limit: limit ? +limit : 5 },
-                {
-                    $project: {
-                        productDetailLookup: 0,
-                        productLookup: 0,
-                        variationOptionLookup: 0,
-                        variationLookup: 0,
-                    },
-                },
-            ],
+            },
         ]
+
         const orders = await Order.aggregate(pipeline)
+
         const totalOrders = await Order.countDocuments()
-        if (!response) return responseData(res, 404, 1, 'No order found')
-        responseData(res, 200, 0, '', '', orders, page, pageSize, totalOrders)
+        if (!orders || orders.length === 0)
+            return responseData(res, 400, 1, 'No order found')
+        responseData(
+            res,
+            200,
+            0,
+            '',
+            '',
+            orders,
+            page ? page : 1,
+            pageSize ? pageSize : 5,
+            totalOrders
+        )
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }

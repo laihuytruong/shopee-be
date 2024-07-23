@@ -6,11 +6,6 @@ const {
     getData,
     checkExist,
 } = require('../middleware/middlewares')
-const {
-    variationValidation,
-} = require('../middleware/validation/productValidation')
-const { checkSchema } = require('express-validator')
-const Variation = require('../models/variation')
 const router = express.Router()
 
 router.delete(
@@ -24,21 +19,10 @@ router.put(
     '/:_id',
     verifyToken,
     checkAdmin,
-    checkSchema(variationValidation),
-    getData,
-    checkExist(Variation, 'name', false),
     variationController.updateVariation
 )
 
-router.post(
-    '/',
-    verifyToken,
-    checkAdmin,
-    checkSchema(variationValidation),
-    getData,
-    checkExist(Variation, 'name', false),
-    variationController.createVariation
-)
+router.post('/', verifyToken, checkAdmin, variationController.createVariation)
 
 router.get('/', verifyToken, checkAdmin, variationController.getAllVariations)
 

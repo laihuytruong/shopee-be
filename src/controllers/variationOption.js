@@ -5,9 +5,49 @@ const { responseData } = require('../utils/helpers')
 
 const getAllOptions = async (req, res) => {
     try {
-        const response = await VariationOption.find()
-        if (!response) return responseData(res, 404, 1, 'No option found')
-        responseData(res, 200, 0, '', null, response)
+        const { page, pageSize } = req.query
+        const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10)
+        const limit = parseInt(pageSize, 10)
+
+        const pipeline = [
+            {
+                $lookup: {
+                    from: 'variations',
+                    localField: 'variationId',
+                    foreignField: '_id',
+                    as: 'variationLookup',
+                },
+            },
+            {
+                $addFields: {
+                    variationId: {
+                        $arrayElemAt: ['$variationLookup', 0],
+                    },
+                },
+            },
+            { $skip: skip ? skip : 0 },
+            { $limit: limit ? +limit : 5 },
+            {
+                $project: {
+                    variationLookup: 0,
+                },
+            },
+        ]
+        const variationOptions = await VariationOption.aggregate(pipeline)
+        const totalVariationOptions = await VariationOption.countDocuments()
+        if (!variationOptions)
+            return responseData(res, 404, 1, 'No variation option found')
+        responseData(
+            res,
+            200,
+            0,
+            '',
+            '',
+            variationOptions,
+            page,
+            pageSize,
+            totalVariationOptions
+        )
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }
@@ -15,24 +55,21 @@ const getAllOptions = async (req, res) => {
 
 const createOption = async (req, res) => {
     try {
-        const { data, dataModel } = req
-        if (dataModel) {
-            return responseData(res, 400, 1, 'Option already exist')
-        }
+        const { variationId, value } = req
         const variation = await Variation.findById(
-            new mongoose.Types.ObjectId(data.variationId)
+            new mongoose.Types.ObjectId(variationId)
         )
         if (!variation) {
             return responseData(res, 404, 1, 'Variation does not exist')
         }
         const response = await VariationOption.create({
-            variationId: new mongoose.Types.ObjectId(data.variationId),
-            value: data.value,
+            variationId: new mongoose.Types.ObjectId(variationId),
+            value: value.trim(),
         })
         if (!response) {
             return responseData(res, 400, 1, 'Option created failed')
         }
-        responseData(res, 201, 0, '', null, response)
+        responseData(res, 201, 0, '', 'Created option successfully')
     } catch (error) {
         console.log(error)
         responseData(res, 500, 1, error.message)
@@ -42,18 +79,14 @@ const createOption = async (req, res) => {
 const updateOption = async (req, res) => {
     try {
         const {
-            data,
             params: { _id },
-            dataModel,
+            body: { variationId, value },
         } = req
         if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
             return responseData(res, 400, 1, 'Invalid option id')
         }
-        if (dataModel) {
-            return responseData(res, 400, 1, 'Variation option already exist')
-        }
         const variation = await Variation.findById(
-            new mongoose.Types.ObjectId(data.variationId)
+            new mongoose.Types.ObjectId(variationId)
         )
         if (!variation) {
             return responseData(res, 404, 1, 'Variation does not exist')
@@ -62,8 +95,8 @@ const updateOption = async (req, res) => {
         const response = await VariationOption.findByIdAndUpdate(
             _id,
             {
-                variationId: new mongoose.Types.ObjectId(data.variationId),
-                value: data.value,
+                variationId: new mongoose.Types.ObjectId(variationId),
+                value: value.trim(),
             },
             {
                 new: true,
@@ -87,7 +120,6 @@ const deleteOption = async (req, res) => {
         if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
             return responseData(res, 400, 1, 'Invalid ID')
         }
-
         const response = await VariationOption.findByIdAndDelete(_id)
         if (!response) return responseData(res, 400, 1, 'No option deleted')
         responseData(res, 201, 0, `Option deleted successfully`)

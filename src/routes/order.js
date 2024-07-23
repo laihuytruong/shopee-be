@@ -9,8 +9,8 @@ router.put('/status/:_id', verifyToken, orderController.updateStatus)
 
 router.post('/', verifyToken, orderController.createOrder)
 
+router.get('/all', verifyToken, checkAdmin, orderController.getAllUserOrders)
 router.get('/:status', verifyToken, orderController.getOrderByStatus)
 router.get('/', verifyToken, orderController.getOrder)
-router.get('/all', verifyToken, checkAdmin, orderController.getAllUserOrders)
 
 module.exports = router
