@@ -91,6 +91,8 @@ const createProductDetail = async (req, res) => {
         const response = await ProductDetail.create({
             ...data,
             product: product._id,
+            price: +data.price,
+            inventory: +data.inventory,
             image: req.file.path,
         })
         if (!response) {

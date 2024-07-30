@@ -31,6 +31,7 @@ const productValidation = {
     image: {},
     discount: {},
     totalRating: {},
+    price: {},
 }
 
 const ratingValidation = {

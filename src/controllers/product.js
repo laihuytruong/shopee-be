@@ -88,27 +88,26 @@ const getAllProducts = async (req, res) => {
     }
 }
 
-const getOneProduct = async (req, res) => {
+const getProductById = async (req, res) => {
     try {
-        const { productName } = req.params
-
+        const { _id } = req.params
         const pipeline = [
             {
                 $match: {
-                    productName,
+                    _id: new mongoose.Types.ObjectId(_id),
                 },
             },
             {
                 $lookup: {
-                    from: 'categories',
+                    from: 'brands',
                     localField: 'brand',
                     foreignField: '_id',
-                    as: 'brandLookup',
+                    as: 'brand',
                 },
             },
             {
                 $unwind: {
-                    path: '$brandLookup',
+                    path: '$brand',
                     preserveNullAndEmptyArrays: true,
                 },
             },
@@ -141,6 +140,11 @@ const getOneProduct = async (req, res) => {
                     },
                 },
             },
+            {
+                $project: {
+                    categoryLookup: 0,
+                },
+            },
         ]
 
         const response = await Product.aggregate(pipeline).exec()
@@ -151,14 +155,89 @@ const getOneProduct = async (req, res) => {
 
         responseData(res, 200, 0, '', null, response[0])
     } catch (error) {
+        console.log('error: ', error)
+        responseData(res, 500, 1, error.message)
+    }
+}
+
+const getProductByProductName = async (req, res) => {
+    try {
+        const { productName } = req.params
+
+        const pipeline = [
+            {
+                $match: {
+                    productName,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'brands',
+                    localField: 'brand',
+                    foreignField: '_id',
+                    as: 'brand',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$brand',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categoryitems',
+                    localField: 'categoryItem',
+                    foreignField: '_id',
+                    as: 'categoryItem',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$categoryItem',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: 'categoryItem.category',
+                    foreignField: '_id',
+                    as: 'categoryLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'categoryItem.category': {
+                        $arrayElemAt: ['$categoryLookup', 0],
+                    },
+                },
+            },
+            {
+                $project: {
+                    categoryLookup: 0,
+                },
+            },
+        ]
+
+        const response = await Product.aggregate(pipeline).exec()
+
+        if (!response || response.length === 0) {
+            return responseData(res, 404, 1, 'No product found')
+        }
+
+        responseData(res, 200, 0, '', null, response[0])
+    } catch (error) {
+        console.log('error: ', error)
         responseData(res, 500, 1, error.message)
     }
 }
 
 const createProduct = async (req, res) => {
     try {
-        const { data } = req
-        console.log(data)
+        const { data, files } = req
+        if (!files || files.length === 0)
+            return responseData(res, 404, 1, 'No files found')
         const categoryItem = await CategoryItem.findById(
             new mongoose.Types.ObjectId(data.categoryItem)
         )
@@ -174,8 +253,10 @@ const createProduct = async (req, res) => {
         const response = await Product.create({
             ...data,
             slug: generateSlug(data.productName),
+            price: +data.price,
             categoryItem: categoryItem._id,
-            brand: new mongoose.Types.ObjectId(data.brand),
+            brand: brand._id,
+            image: files.map((file) => file.path),
         })
         if (!response)
             return responseData(res, 400, 1, 'Product created failed')
@@ -191,7 +272,9 @@ const updateProduct = async (req, res) => {
         const {
             data,
             params: { _id },
+            files,
         } = req
+        console.log('files: ', files)
         if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
             return responseData(res, 400, 1, 'Invalid product id')
         }
@@ -207,20 +290,24 @@ const updateProduct = async (req, res) => {
         if (!brand) {
             return responseData(res, 404, 1, 'Brand not found')
         }
+        if (!files) {
+            return responseData(res, 404, 1, 'No files found')
+        }
 
         const response = await Product.findByIdAndUpdate(
             _id,
             {
                 ...data,
                 slug: generateSlug(data.productName),
-                categoryItem: new mongoose.Types.ObjectId(data.categoryItem),
-                brand: new mongoose.Types.ObjectId(data.brand),
+                price: +data.price,
+                categoryItem: categoryItem._id,
+                brand: brand._id,
+                image: files.map((file) => file.path),
             },
             {
                 new: true,
             }
         )
-        console.log(response)
         if (!response) return responseData(res, 400, 1, 'No product updated')
         responseData(res, 200, 0, 'Update product successfully')
     } catch (error) {
@@ -322,7 +409,6 @@ const uploadImagesProduct = async (req, res) => {
             },
             { new: true }
         )
-        console.log(response)
         if (!response) return responseData(res, 400, 1, 'Upload image failed')
         responseData(res, 200, 1, 'Upload image successfully', null, response)
     } catch (error) {
@@ -695,7 +781,8 @@ const filter = async (req, res) => {
 
 module.exports = {
     getAllProducts,
-    getOneProduct,
+    getProductById,
+    getProductByProductName,
     createProduct,
     updateProduct,
     deleteProduct,

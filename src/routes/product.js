@@ -32,6 +32,7 @@ router.put(
     '/:_id',
     verifyToken,
     checkAdmin,
+    uploadCloud.array('image', 10),
     checkSchema(productValidation),
     getData,
     productController.updateProduct
@@ -49,6 +50,7 @@ router.post(
     '/',
     verifyToken,
     checkAdmin,
+    uploadCloud.array('image', 10),
     checkSchema(productValidation),
     getData,
     productController.createProduct
@@ -61,7 +63,8 @@ router.get(
     verifyToken,
     productController.getProductsByCategory
 )
-router.get('/:productName', productController.getOneProduct)
+router.get('/product/:productName', productController.getProductByProductName)
+router.get('/:_id', productController.getProductById)
 router.get('/', productController.getAllProducts)
 
 module.exports = router
