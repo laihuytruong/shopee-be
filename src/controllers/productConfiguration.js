@@ -72,6 +72,9 @@ const getAllConfigurations = async (req, res) => {
                 },
             },
             {
+                $unwind: '$variationOptionId',
+            },
+            {
                 $lookup: {
                     from: 'variationoptions',
                     localField: 'variationOptionId',
@@ -99,6 +102,13 @@ const getAllConfigurations = async (req, res) => {
                     'variationOptionId.variationId': {
                         $arrayElemAt: ['$variationLookup', 0],
                     },
+                },
+            },
+            {
+                $group: {
+                    _id: '$_id',
+                    productDetailId: { $first: '$productDetailId' },
+                    variationOptionId: { $push: '$variationOptionId' },
                 },
             },
             { $skip: skip ? skip : 0 },
@@ -140,29 +150,68 @@ const createConfiguration = async (req, res) => {
         const productDetail = await ProductDetail.findById(
             new mongoose.Types.ObjectId(data.productDetailId)
         )
-        const variationOption = await VariationOption.findById(
-            new mongoose.Types.ObjectId(data.variationOptionId)
-        )
-        if (!productDetail || !variationOption) {
+        if (!productDetail) {
+            return responseData(res, 404, 1, 'No product detail found')
+        }
+
+        const variationOptions = await VariationOption.find({
+            _id: {
+                $in: data.variationOptionId
+                    .split(', ')
+                    .map((id) => new mongoose.Types.ObjectId(id)),
+            },
+        })
+
+        if (
+            variationOptions.length !==
+            data.variationOptionId.split(', ').length
+        ) {
             return responseData(
                 res,
                 404,
                 1,
-                'No product detail or no variation option'
+                'One or more variation options not found'
             )
         }
+
+        const existingConfigurations = await ProductConfiguration.find({
+            productDetailId: new mongoose.Types.ObjectId(data.productDetailId),
+        })
+
+        const newVariationOptionId = data.variationOptionId
+            .split(', ')
+            .map((id) => id.toString())
+
+        const isDuplicate = existingConfigurations.some((config) => {
+            const existingVariationOptionId = config.variationOptionId.map(
+                (id) => id.toString()
+            )
+            return newVariationOptionId.every((id) =>
+                existingVariationOptionId.includes(id)
+            )
+        })
+
+        if (isDuplicate) {
+            return responseData(
+                res,
+                400,
+                1,
+                'Variation options already exist in configuration'
+            )
+        }
+
         const response = await ProductConfiguration.create({
             productDetailId: new mongoose.Types.ObjectId(data.productDetailId),
-            variationOptionId: new mongoose.Types.ObjectId(
-                data.variationOptionId
-            ),
+            variationOptionId: data.variationOptionId
+                .split(', ')
+                .map((id) => new mongoose.Types.ObjectId(id)),
         })
         if (!response) {
             return responseData(
                 res,
                 400,
                 1,
-                'Product configuration created failed'
+                'Product configuration creation failed'
             )
         }
         responseData(res, 201, 0, '', 'Create configuration successfully')
@@ -178,40 +227,88 @@ const updateConfiguration = async (req, res) => {
             data,
             params: { _id },
         } = req
+
         if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
             return responseData(res, 400, 1, 'Invalid product configuration id')
         }
+
         const productDetail = await ProductDetail.findById(
             new mongoose.Types.ObjectId(data.productDetailId)
-        )
-        const variationOption = await VariationOption.findById(
-            new mongoose.Types.ObjectId(data.variationOptionId)
         )
         if (!productDetail) {
             return responseData(res, 404, 1, 'Product detail not found')
         }
-        if (!variationOption) {
-            return responseData(res, 404, 1, 'Variation option not found')
+
+        const variationOptions = await VariationOption.find({
+            _id: {
+                $in: data.variationOptionId
+                    .split(', ')
+                    .map((id) => new mongoose.Types.ObjectId(id)),
+            },
+        })
+
+        if (
+            variationOptions.length !==
+            data.variationOptionId.split(', ').length
+        ) {
+            return responseData(
+                res,
+                404,
+                1,
+                'One or more variation options not found'
+            )
         }
 
-        const response = await ProductDetail.findByIdAndUpdate(
+        const existingConfigurations = await ProductConfiguration.find({
+            _id: { $ne: _id },
+            productDetailId: new mongoose.Types.ObjectId(data.productDetailId),
+        })
+
+        const newVariationOptionIds = data.variationOptionId
+            .split(', ')
+            .map((id) => id.toString())
+
+        const isDuplicate = existingConfigurations.some((config) => {
+            const existingVariationOptionIds = config.variationOptionId.map(
+                (id) => id.toString()
+            )
+            return (
+                newVariationOptionIds.length ===
+                    existingVariationOptionIds.length &&
+                newVariationOptionIds.every((id) =>
+                    existingVariationOptionIds.includes(id)
+                )
+            )
+        })
+
+        if (isDuplicate) {
+            return responseData(
+                res,
+                400,
+                1,
+                'Configuration with the same productDetailId and variationOptionIds already exists'
+            )
+        }
+
+        const response = await ProductConfiguration.findByIdAndUpdate(
             _id,
             {
                 productDetailId: new mongoose.Types.ObjectId(
                     data.productDetailId
                 ),
-                variationOptionId: new mongoose.Types.ObjectId(
-                    data.variationOptionId
-                ),
+                variationOptionId: data.variationOptionId
+                    .split(', ')
+                    .map((id) => new mongoose.Types.ObjectId(id)),
             },
             {
                 new: true,
             }
         )
-        console.log(response)
+
         if (!response) {
             return responseData(res, 400, 1, 'No product configuration updated')
         }
+
         responseData(res, 200, 0, 'Product configuration updated successfully')
     } catch (error) {
         console.log(error)
@@ -239,19 +336,24 @@ const deleteProductConfiguration = async (req, res) => {
 const getConfigurationByDetail = async (req, res) => {
     try {
         const { slug } = req.params
+        const { page, pageSize } = req.query
+        const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10)
+        const limit = parseInt(pageSize, 10)
+
         const pipeline = [
             {
                 $lookup: {
                     from: 'productdetails',
                     localField: 'productDetailId',
                     foreignField: '_id',
-                    as: 'productDetailId',
+                    as: 'productDetailLookup',
                 },
             },
             {
-                $unwind: {
-                    path: '$productDetailId',
-                    preserveNullAndEmptyArrays: true,
+                $addFields: {
+                    productDetailId: {
+                        $arrayElemAt: ['$productDetailLookup', 0],
+                    },
                 },
             },
             {
@@ -271,7 +373,22 @@ const getConfigurationByDetail = async (req, res) => {
             },
             {
                 $match: {
-                    'productLookup.slug': slug,
+                    'productDetailId.product.slug': slug,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'brands',
+                    localField: 'productDetailId.product.brand',
+                    foreignField: '_id',
+                    as: 'brandLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'productDetailId.product.brand': {
+                        $arrayElemAt: ['$brandLookup', 0],
+                    },
                 },
             },
             {
@@ -305,17 +422,21 @@ const getConfigurationByDetail = async (req, res) => {
                 },
             },
             {
+                $unwind: '$variationOptionId',
+            },
+            {
                 $lookup: {
                     from: 'variationoptions',
                     localField: 'variationOptionId',
                     foreignField: '_id',
-                    as: 'variationOptionId',
+                    as: 'variationOptionLookup',
                 },
             },
             {
-                $unwind: {
-                    path: '$variationOptionId',
-                    preserveNullAndEmptyArrays: true,
+                $addFields: {
+                    variationOptionId: {
+                        $arrayElemAt: ['$variationOptionLookup', 0],
+                    },
                 },
             },
             {
@@ -335,27 +456,51 @@ const getConfigurationByDetail = async (req, res) => {
             },
             {
                 $group: {
-                    _id: null,
+                    _id: '$_id',
                     minPrice: { $min: '$productDetailId.price' },
                     maxPrice: { $max: '$productDetailId.price' },
-                    configurations: { $push: '$$ROOT' },
+                    productDetailId: { $first: '$productDetailId' },
+                    variationOptionId: { $push: '$variationOptionId' },
                 },
             },
+            { $skip: skip ? skip : 0 },
+            { $limit: limit ? +limit : 5 },
             {
                 $project: {
-                    productLookup: 0,
-                    variationLookup: 0,
-                    categoryItemLookup: 0,
-                    categoryLookup: 0,
+                    'configurations.productDetailLookup': 0,
+                    'configurations.productLookup': 0,
+                    'configurations.brandLookup': 0,
+                    'configurations.categoryItemLookup': 0,
+                    'configurations.categoryLookup': 0,
+                    'configurations.variationOptionLookup': 0,
+                    'configurations.productLookup': 0,
+                    'configurations.variationLookup': 0,
                 },
             },
         ]
+
         const response = await ProductConfiguration.aggregate(pipeline)
+        const totalConfigurations = await ProductConfiguration.countDocuments()
+
         if (!response || response.length === 0) {
             return responseData(res, 404, 1, 'No configuration found')
         }
-        const result = response[0]
-        responseData(res, 200, 0, '', null, result)
+        const result = {
+            minPrice: response[0].minPrice,
+            maxPrice: response[0].maxPrice,
+            configurations: response,
+        }
+        responseData(
+            res,
+            200,
+            0,
+            '',
+            null,
+            result,
+            page,
+            pageSize,
+            totalConfigurations
+        )
     } catch (error) {
         console.log(error)
         responseData(res, 500, 1, error.message)

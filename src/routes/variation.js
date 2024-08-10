@@ -24,6 +24,13 @@ router.put(
 
 router.post('/', verifyToken, checkAdmin, variationController.createVariation)
 
+router.get(
+    '/:categoryId',
+    verifyToken,
+    checkAdmin,
+    variationController.getVariationByCategory
+)
+
 router.get('/', verifyToken, checkAdmin, variationController.getAllVariations)
 
 module.exports = router

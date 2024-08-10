@@ -274,7 +274,6 @@ const updateProduct = async (req, res) => {
             params: { _id },
             files,
         } = req
-        console.log('files: ', files)
         if (!_id || !mongoose.Types.ObjectId.isValid(_id)) {
             return responseData(res, 400, 1, 'Invalid product id')
         }

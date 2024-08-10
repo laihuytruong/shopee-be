@@ -52,6 +52,50 @@ const getAllVariations = async (req, res) => {
     }
 }
 
+const getVariationByCategory = async (req, res) => {
+    try {
+        const { categoryId } = req.params
+        const category = await Category.findById(
+            new mongoose.Types.ObjectId(categoryId)
+        )
+        if (!category) return responseData(res, 404, 1, 'No category found')
+
+        const pipeline = [
+            {
+                $match: {
+                    categoryId: category._id,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: 'categoryId',
+                    foreignField: '_id',
+                    as: 'categoryLookup',
+                },
+            },
+            {
+                $addFields: {
+                    categoryId: {
+                        $arrayElemAt: ['$categoryLookup', 0],
+                    },
+                },
+            },
+            {
+                $project: {
+                    categoryLookup: 0,
+                },
+            },
+        ]
+        const variations = await Variation.aggregate(pipeline)
+        if (!variations) return responseData(res, 404, 1, 'No variation found')
+        responseData(res, 200, 0, '', '', variations)
+    } catch (error) {
+        console.log('error: ' + error)
+        responseData(res, 500, 1, error.message)
+    }
+}
+
 const createVariation = async (req, res) => {
     try {
         const { categoryId, name } = req.body
@@ -129,6 +173,7 @@ const deleteVariation = async (req, res) => {
 
 module.exports = {
     getAllVariations,
+    getVariationByCategory,
     createVariation,
     updateVariation,
     deleteVariation,

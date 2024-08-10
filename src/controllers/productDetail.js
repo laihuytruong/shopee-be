@@ -11,6 +11,9 @@ const cloudinary = require('cloudinary').v2
 const getProductDetail = async (req, res) => {
     try {
         const { slug } = req.params
+        const { page, pageSize } = req.query
+        const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10)
+        const limit = parseInt(pageSize, 10)
         const product = await Product.findOne({ slug })
         const pipeline = [
             {
@@ -62,6 +65,8 @@ const getProductDetail = async (req, res) => {
                     },
                 },
             },
+            { $skip: skip ? skip : 0 },
+            { $limit: limit ? +limit : 5 },
             {
                 $project: {
                     categoryItemLookup: 0,
@@ -70,9 +75,22 @@ const getProductDetail = async (req, res) => {
             },
         ]
         const response = await ProductDetail.aggregate(pipeline)
+        const totalProductDetails = await ProductDetail.countDocuments({
+            product: product._id,
+        })
         if (!response)
             return responseData(res, 404, 1, 'No product detail found')
-        responseData(res, 200, 0, '', null, response)
+        responseData(
+            res,
+            200,
+            0,
+            '',
+            '',
+            response,
+            page,
+            pageSize,
+            totalProductDetails
+        )
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }
@@ -129,8 +147,9 @@ const updateProductDetail = async (req, res) => {
             _id,
             {
                 ...data,
-                slug: generateSlug(data.productDetailName),
                 product: product._id,
+                price: +data.price,
+                inventory: +data.inventory,
                 image: req.file.path,
             },
             {
@@ -141,12 +160,6 @@ const updateProductDetail = async (req, res) => {
         if (!response) {
             cloudinary.uploader.destroy(req.file.filename)
             return responseData(res, 400, 1, 'No product updated')
-        }
-        const imageIndex = product.image.indexOf(productDetail.image)
-        if (imageIndex > -1) {
-            product.image[imageIndex] = req.file.path
-        } else {
-            product.image.push(req.file.path)
         }
         responseData(res, 200, 0, 'Product updated successfully')
     } catch (error) {
@@ -175,12 +188,7 @@ const deleteProductDetail = async (req, res) => {
             )
             await product.save()
         }
-        responseData(
-            res,
-            201,
-            0,
-            `Product with productDetailName ${response.productDetailName} deleted successfully`
-        )
+        responseData(res, 201, 0, `Deleted product detail successfully`)
     } catch (error) {
         responseData(res, 500, 1, error.message)
     }

@@ -5,10 +5,12 @@ const ProductConfigurationSchema = new mongoose.Schema({
         type: mongoose.Types.ObjectId,
         ref: 'ProductDetail',
     },
-    variationOptionId: {
-        type: mongoose.Types.ObjectId,
-        ref: 'VariationOption',
-    },
+    variationOptionId: [
+        {
+            type: mongoose.Types.ObjectId,
+            ref: 'VariationOption',
+        },
+    ],
 })
 
 module.exports = mongoose.model(

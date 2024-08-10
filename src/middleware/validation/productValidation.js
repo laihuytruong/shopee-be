@@ -90,9 +90,11 @@ const productConfigurationValidation = {
     variationOptionId: {
         custom: {
             options: (value) => {
-                if (!mongoose.Types.ObjectId.isValid(value)) {
-                    throw new Error('Invalid variation option id')
-                }
+                value.split(', ').forEach((id) => {
+                    if (!mongoose.Types.ObjectId.isValid(id)) {
+                        throw new Error('Invalid variation option id')
+                    }
+                })
                 return true
             },
         },

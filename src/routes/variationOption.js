@@ -25,10 +25,16 @@ router.post(
 )
 
 router.get(
+    '/:_id',
+    verifyToken,
+    checkAdmin,
+    variationOptionController.getOptionByVariationId
+)
+
+router.get(
     '/',
     verifyToken,
     checkAdmin,
     variationOptionController.getAllOptions
 )
-
-module.exports = router
+'/', verifyToken, (module.exports = router)
