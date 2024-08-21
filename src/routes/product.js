@@ -64,6 +64,7 @@ router.get(
     productController.getProductsByCategory
 )
 router.get('/product/:productName', productController.getProductByProductName)
+router.get('/slug/:slug', productController.getProductBySlug)
 router.get('/:_id', productController.getProductById)
 router.get('/', productController.getAllProducts)
 

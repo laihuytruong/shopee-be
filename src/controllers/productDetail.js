@@ -14,7 +14,9 @@ const getProductDetail = async (req, res) => {
         const { page, pageSize } = req.query
         const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10)
         const limit = parseInt(pageSize, 10)
-        const product = await Product.findOne({ slug })
+        const product = await Product.findOne({
+            slug,
+        })
         const pipeline = [
             {
                 $match: {
@@ -92,6 +94,7 @@ const getProductDetail = async (req, res) => {
             totalProductDetails
         )
     } catch (error) {
+        console.log(error)
         responseData(res, 500, 1, error.message)
     }
 }

@@ -71,7 +71,7 @@ const checkAdmin = async (req, res, next) => {
                 err: 1,
                 msg: 'Invalid role',
             })
-        if (roleData.roleName !== 'admin')
+        if (roleData.roleName !== 'admin' && roleData.roleName !== 'root')
             return res.status(401).json({
                 err: 1,
                 msg: 'Please login admin account',

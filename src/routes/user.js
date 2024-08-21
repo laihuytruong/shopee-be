@@ -41,14 +41,7 @@ router.put(
 )
 router.get('/current', verifyToken, userController.getCurrentUser)
 
-router.put(
-    '/:_id',
-    verifyToken,
-    checkAdmin,
-    checkSchema(updateUserByAdminValidation),
-    getData,
-    userController.updateUserByAdmin
-)
+router.put('/update-role', verifyToken, checkAdmin, userController.updateUserByAdmin)
 router.delete('/:_id', verifyToken, checkAdmin, userController.deleteUser)
 router.get('/', verifyToken, checkAdmin, userController.getAllUsers)
 

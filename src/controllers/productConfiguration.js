@@ -373,7 +373,7 @@ const getConfigurationByDetail = async (req, res) => {
             },
             {
                 $match: {
-                    'productDetailId.product.slug': slug,
+                    'productLookup.slug': slug,
                 },
             },
             {
@@ -480,16 +480,23 @@ const getConfigurationByDetail = async (req, res) => {
         ]
 
         const response = await ProductConfiguration.aggregate(pipeline)
-        const totalConfigurations = await ProductConfiguration.countDocuments()
+        const totalConfigurations = await ProductConfiguration.countDocuments({
+            'productDetailId.product.slug': slug,
+        })
 
         if (!response || response.length === 0) {
             return responseData(res, 404, 1, 'No configuration found')
         }
+        const allPrices = response.map((item) => item.productDetailId.price)
+        const minPrice = Math.min(...allPrices)
+        const maxPrice = Math.max(...allPrices)
+
         const result = {
-            minPrice: response[0].minPrice,
-            maxPrice: response[0].maxPrice,
+            minPrice,
+            maxPrice,
             configurations: response,
         }
+        
         responseData(
             res,
             200,

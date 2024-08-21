@@ -414,12 +414,25 @@ const paginationSortSearch = async (model, query, page, limit, sort) => {
     return { response, count }
 }
 
-const filterItems = (items, fieldName, normalizedSearch) => {
+const filterItems = (items, fieldName, fieldNameItems, normalizedSearch) => {
     const normalizedSearchArr = normalizedSearch.toLowerCase().split(' ')
     return items.filter((item) => {
-        const fieldValueArr = removeAccents(item[fieldName])
-            .toLowerCase()
-            .split(' ')
+        let fieldValueArr = []
+
+        if (fieldNameItems && Array.isArray(fieldNameItems)) {
+            fieldNameItems.forEach((subField) => {
+                const fieldValue = removeAccents(item[fieldName][subField])
+                if (fieldValue) {
+                    fieldValueArr = fieldValueArr.concat(
+                        fieldValue.toLowerCase().split(' ')
+                    )
+                }
+            })
+        } else {
+            fieldValueArr = removeAccents(item[fieldName])
+                .toLowerCase()
+                .split(' ')
+        }
         return normalizedSearchArr.every((word) =>
             fieldValueArr.some((fieldWord) => fieldWord.includes(word))
         )
@@ -430,6 +443,7 @@ const performSearch = async (
     model,
     pipeline,
     fieldName,
+    fieldNameItems,
     normalizedSearch,
     skip,
     limit
@@ -438,9 +452,150 @@ const performSearch = async (
         .aggregate(pipeline)
         .skip(skip ? +skip : 0)
         .limit(limit ? +limit : 5)
-    const filteredItems = filterItems(items, fieldName, normalizedSearch)
-    const totalItems = await model.countDocuments()
+    const filteredItems = filterItems(
+        items,
+        fieldName,
+        fieldNameItems,
+        normalizedSearch
+    )
+    const totalItems = await items.length
     return { filteredItems, totalItems }
+}
+
+const getPipelineByType = (type) => {
+    switch (type) {
+        case 'sales':
+            return [
+                {
+                    $unwind: '$products',
+                },
+                {
+                    $lookup: {
+                        from: 'productdetails',
+                        localField: 'products.productDetail',
+                        foreignField: '_id',
+                        as: 'productDetail',
+                    },
+                },
+                {
+                    $unwind: '$productDetail',
+                },
+                {
+                    $lookup: {
+                        from: 'products',
+                        localField: 'productDetail.product',
+                        foreignField: '_id',
+                        as: 'product',
+                    },
+                },
+                {
+                    $unwind: '$product',
+                },
+                {
+                    $addFields: {
+                        discountedPrice: {
+                            $multiply: [
+                                '$productDetail.price',
+                                {
+                                    $subtract: [
+                                        1,
+                                        { $divide: ['$product.discount', 100] },
+                                    ],
+                                },
+                            ],
+                        },
+                    },
+                },
+                {
+                    $addFields: {
+                        totalAmount: {
+                            $sum: [
+                                {
+                                    $multiply: [
+                                        '$discountedPrice',
+                                        '$products.quantity',
+                                    ],
+                                },
+                                15000,
+                            ],
+                        },
+                    },
+                },
+                {
+                    $group: {
+                        _id: { month: { $month: '$createdAt' } },
+                        total: { $sum: '$totalAmount' },
+                    },
+                },
+                { $sort: { '_id.month': 1 } },
+                {
+                    $project: {
+                        _id: 0,
+                        month: '$_id.month',
+                        total: 1,
+                    },
+                },
+            ]
+        case 'orders':
+            return [
+                {
+                    $group: {
+                        _id: { month: { $month: '$createdAt' } },
+                        total: { $sum: 1 },
+                    },
+                },
+                { $sort: { '_id.month': 1 } },
+                {
+                    $project: {
+                        _id: 0,
+                        month: '$_id.month',
+                        total: 1,
+                    },
+                },
+            ]
+        case 'done':
+            return [
+                {
+                    $match: { status: 'Done' },
+                },
+                {
+                    $group: {
+                        _id: { month: { $month: '$createdAt' } },
+                        total: { $sum: 1 },
+                    },
+                },
+                { $sort: { '_id.month': 1 } },
+                {
+                    $project: {
+                        _id: 0,
+                        month: '$_id.month',
+                        total: 1,
+                    },
+                },
+            ]
+        case 'waiting':
+            return [
+                {
+                    $match: { status: 'Waiting Delivering' },
+                },
+                {
+                    $group: {
+                        _id: { month: { $month: '$createdAt' } },
+                        total: { $sum: 1 },
+                    },
+                },
+                { $sort: { '_id.month': 1 } },
+                {
+                    $project: {
+                        _id: 0,
+                        month: '$_id.month',
+                        total: 1,
+                    },
+                },
+            ]
+        default:
+            return []
+    }
 }
 
 module.exports = {
@@ -453,4 +608,5 @@ module.exports = {
     getFileNameCloudinary,
     paginationSortSearch,
     performSearch,
+    getPipelineByType,
 }

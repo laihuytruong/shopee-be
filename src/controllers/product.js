@@ -160,6 +160,79 @@ const getProductById = async (req, res) => {
     }
 }
 
+const getProductBySlug = async (req, res) => {
+    try {
+        const { slug } = req.params
+        console.log('req.params: ', req.params)
+        const pipeline = [
+            {
+                $match: {
+                    slug,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'brands',
+                    localField: 'brand',
+                    foreignField: '_id',
+                    as: 'brand',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$brand',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categoryitems',
+                    localField: 'categoryItem',
+                    foreignField: '_id',
+                    as: 'categoryItem',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$categoryItem',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'categories',
+                    localField: 'categoryItem.category',
+                    foreignField: '_id',
+                    as: 'categoryLookup',
+                },
+            },
+            {
+                $addFields: {
+                    'categoryItem.category': {
+                        $arrayElemAt: ['$categoryLookup', 0],
+                    },
+                },
+            },
+            {
+                $project: {
+                    categoryLookup: 0,
+                },
+            },
+        ]
+
+        const response = await Product.aggregate(pipeline).exec()
+
+        if (!response || response.length === 0) {
+            return responseData(res, 404, 1, 'No product found')
+        }
+
+        responseData(res, 200, 0, '', null, response[0])
+    } catch (error) {
+        console.log('error: ', error)
+        responseData(res, 500, 1, error.message)
+    }
+}
+
 const getProductByProductName = async (req, res) => {
     try {
         const { productName } = req.params
@@ -375,7 +448,6 @@ const handleRating = async (req, res) => {
             )
         }
 
-        // Average rating
         const updatedProduct = await Product.findById(pid)
         const ratingCount = updatedProduct.rating.length
         const sumRating = updatedProduct.rating.reduce(
@@ -632,6 +704,7 @@ const search = async (req, res) => {
                 Product,
                 productPipeline,
                 'productName',
+                null,
                 normalizedSearch,
                 skip,
                 limit
@@ -661,6 +734,7 @@ const search = async (req, res) => {
                 CategoryItem,
                 categoryItemPipeline,
                 'categoryItemName',
+                null,
                 normalizedSearch,
                 skip,
                 limit
@@ -781,6 +855,7 @@ const filter = async (req, res) => {
 module.exports = {
     getAllProducts,
     getProductById,
+    getProductBySlug,
     getProductByProductName,
     createProduct,
     updateProduct,

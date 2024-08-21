@@ -11,12 +11,52 @@ const cloudinary = require('cloudinary').v2
 
 const getAllUsers = async (req, res) => {
     try {
-        const response = await User.find().select(
-            '-refreshToken -password -role'
-        )
+        const { page, pageSize } = req.query
+        const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10)
+        const limit = parseInt(pageSize, 10)
+        const pipeline = [
+            {
+                $match: {
+                    role: {
+                        $in: [
+                            new mongoose.Types.ObjectId(
+                                '6646091905062f8ea9e1e7a8'
+                            ),
+                            new mongoose.Types.ObjectId(
+                                '66460a4ce2500c3ce453d161'
+                            ),
+                        ],
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: 'roles',
+                    localField: 'role',
+                    foreignField: '_id',
+                    as: 'roleLookup',
+                },
+            },
+            {
+                $addFields: {
+                    role: {
+                        $arrayElemAt: ['$roleLookup', 0],
+                    },
+                },
+            },
+            { $skip: skip ? skip : 0 },
+            { $limit: limit ? +limit : 10 },
+            {
+                $project: {
+                    roleLookup: 0,
+                },
+            },
+        ]
+        const response = await User.aggregate(pipeline)
+        const totalUsers = await User.countDocuments()
         if (!response || response.length == 0)
             return responseData(res, 404, 1, 'No user found')
-        responseData(res, 200, 0, '', response.length, response)
+        responseData(res, 200, 0, '', '', response, page, pageSize, totalUsers)
     } catch (error) {
         console.log(error)
         responseData(res, 500, 1, error.message)
@@ -31,125 +71,239 @@ const getCurrentUser = async (req, res) => {
             return responseData(res, 400, 1, 'Invalid user ID')
         }
 
-        const userId = new mongoose.Types.ObjectId(_id)
         const pipeline = [
             {
                 $match: {
-                    _id: userId,
-                },
-            },
-            {
-                $addFields: {
-                    cart: { $ifNull: ['$cart', []] },
-                },
-            },
-            {
-                $unwind: {
-                    path: '$cart',
-                    preserveNullAndEmptyArrays: true,
+                    _id: new mongoose.Types.ObjectId(_id),
                 },
             },
             {
                 $lookup: {
-                    from: 'productdetails',
-                    localField: 'cart.productDetail',
+                    from: 'roles',
+                    localField: 'role',
                     foreignField: '_id',
-                    as: 'cart.productDetail',
+                    as: 'roleInfo',
                 },
             },
             {
                 $unwind: {
-                    path: '$cart.productDetail',
+                    path: '$roleInfo',
                     preserveNullAndEmptyArrays: true,
                 },
             },
             {
-                $lookup: {
-                    from: 'products',
-                    localField: 'cart.productDetail.product',
-                    foreignField: '_id',
-                    as: 'cart.productDetail.product',
-                },
-            },
-            {
-                $unwind: {
-                    path: '$cart.productDetail.product',
-                    preserveNullAndEmptyArrays: true,
-                },
-            },
-            {
-                $lookup: {
-                    from: 'variationoptions',
-                    localField: 'cart.variationOption',
-                    foreignField: '_id',
-                    as: 'cart.variationOption',
-                },
-            },
-            {
-                $unwind: {
-                    path: '$cart.variationOption',
-                    preserveNullAndEmptyArrays: true,
-                },
-            },
-            {
-                $lookup: {
-                    from: 'variations',
-                    localField: 'cart.variationOption.variationId',
-                    foreignField: '_id',
-                    as: 'cart.variationOption.variationId',
-                },
-            },
-            {
-                $unwind: {
-                    path: '$cart.variationOption.variationId',
-                    preserveNullAndEmptyArrays: true,
-                },
-            },
-            {
-                $sort: {
-                    updatedAt: -1,
-                },
-            },
-            {
-                $group: {
-                    _id: '$_id',
-                    user: { $first: '$$ROOT' },
-                    cart: {
-                        $push: '$cart',
-                    },
-                },
-            },
-            {
-                $addFields: {
-                    cart: {
-                        $cond: {
-                            if: {
-                                $and: [
-                                    { $ne: ['$cart.productDetail', {}] },
-                                    {
-                                        $ne: [
-                                            '$cart.variationOption.variationId',
-                                            [],
-                                        ],
-                                    },
-                                ],
+                $facet: {
+                    userInfo: [
+                        {
+                            $project: {
+                                _id: 1,
+                                name: 1,
+                                email: 1,
+                                username: 1,
+                                dateOfBirth: 1,
+                                address: 1,
+                                phoneNumber: 1,
+                                sex: 1,
+                                avatar: 1,
+                                role: '$roleInfo',
                             },
-                            then: { $reverseArray: '$cart' },
-                            else: [],
                         },
-                    },
+                    ],
+                    cart: [
+                        {
+                            $addFields: {
+                                cart: { $ifNull: ['$cart', []] },
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: '$cart',
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: 'productdetails',
+                                localField: 'cart.productDetail',
+                                foreignField: '_id',
+                                as: 'cart.productDetail',
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: '$cart.productDetail',
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: 'products',
+                                localField: 'cart.productDetail.product',
+                                foreignField: '_id',
+                                as: 'cart.productDetail.product',
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: '$cart.productDetail.product',
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: 'brands',
+                                localField: 'cart.productDetail.product.brand',
+                                foreignField: '_id',
+                                as: 'cart.productDetail.product.brand',
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: '$cart.productDetail.product.brand',
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: 'categoryitems',
+                                localField:
+                                    'cart.productDetail.product.categoryItem',
+                                foreignField: '_id',
+                                as: 'cart.productDetail.product.categoryItem',
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: '$cart.productDetail.product.categoryItem',
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: 'categories',
+                                localField:
+                                    'cart.productDetail.product.categoryItem.category',
+                                foreignField: '_id',
+                                as: 'cart.productDetail.product.categoryItem.category',
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: '$cart.productDetail.product.categoryItem.category',
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: 'variationoptions',
+                                localField: 'cart.variationOption',
+                                foreignField: '_id',
+                                as: 'cart.variationOption',
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: '$cart.variationOption',
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: 'variations',
+                                localField: 'cart.variationOption.variationId',
+                                foreignField: '_id',
+                                as: 'cart.variationOption.variationId',
+                            },
+                        },
+                        {
+                            $unwind: {
+                                path: '$cart.variationOption.variationId',
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $group: {
+                                _id: '$cart._id',
+                                productDetail: {
+                                    $first: '$cart.productDetail',
+                                },
+                                quantity: { $first: '$cart.quantity' },
+                                variationOption: {
+                                    $push: {
+                                        $cond: {
+                                            if: {
+                                                $ne: [
+                                                    '$cart.variationOption',
+                                                    {},
+                                                ],
+                                            },
+                                            then: '$cart.variationOption',
+                                            else: [],
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        {
+                            $group: {
+                                _id: null,
+                                cart: {
+                                    $push: {
+                                        $cond: {
+                                            if: {
+                                                $and: [
+                                                    {
+                                                        $ne: [
+                                                            '$productDetail',
+                                                            {},
+                                                        ],
+                                                    },
+                                                    {
+                                                        $ne: [
+                                                            '$quantity',
+                                                            null,
+                                                        ],
+                                                    },
+                                                    {
+                                                        $ne: [
+                                                            '$variationOption',
+                                                            [],
+                                                        ],
+                                                    },
+                                                ],
+                                            },
+                                            then: '$$ROOT',
+                                            else: null,
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        {
+                            $addFields: {
+                                cart: {
+                                    $filter: {
+                                        input: '$cart',
+                                        as: 'item',
+                                        cond: { $ne: ['$$item', null] },
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $project: {
+                    userInfo: { $arrayElemAt: ['$userInfo', 0] },
+                    cart: { $arrayElemAt: ['$cart.cart', 0] },
                 },
             },
             {
                 $replaceRoot: {
                     newRoot: {
-                        $mergeObjects: ['$user', { cart: '$cart' }],
+                        $mergeObjects: ['$userInfo', { cart: '$cart' }],
                     },
-                },
-            },
-            {
-                $project: {
-                    'user.cart': 0,
                 },
             },
         ]
@@ -232,29 +386,41 @@ const changePassword = async (req, res) => {
 const updateUserByAdmin = async (req, res) => {
     try {
         const {
-            params: { _id },
-            data: { role, isBlocked },
+            body: { ids, role, isBlocked },
         } = req
-        if (!_id || !mongoose.Types.ObjectId.isValid(_id))
-            return responseData(res, 400, 1, 'Invalid ID')
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return responseData(res, 400, 1, 'Invalid IDs array')
+        }
 
-        const newRole = new mongoose.Types.ObjectId(role)
-        const roleData = await Role.findById(newRole)
-        if (!roleData) return responseData(res, 404, 1, 'Role does not exist')
-        const response = await User.findByIdAndUpdate(
-            _id,
+        if (!role || !mongoose.Types.ObjectId.isValid(role)) {
+            return responseData(res, 400, 1, 'Invalid role ID')
+        }
+
+        const roleData = await Role.findById(role)
+        if (!roleData) {
+            return responseData(res, 404, 1, 'Role does not exist')
+        }
+
+        const response = await User.updateMany(
             {
-                role: newRole,
-                isBlocked: JSON.parse(isBlocked),
+                _id: {
+                    $in: ids.map((id) => new mongoose.Types.ObjectId(id)),
+                },
             },
             {
-                new: true,
-            }
+                role: roleData._id,
+                isBlocked: JSON.parse(isBlocked),
+            },
+            { new: true }
         )
             .select('-refreshToken -password')
             .populate('role', 'roleName')
-        if (!response) return responseData(res, 400, 1, 'Update user failed')
-        responseData(res, 200, 0, '', null, response)
+
+        if (response.nModified === 0) {
+            return responseData(res, 400, 1, 'No users updated')
+        }
+
+        responseData(res, 200, 0, 'Users updated successfully')
     } catch (error) {
         console.log(error)
         responseData(res, 500, 1, error.message)
@@ -303,9 +469,14 @@ const uploadAvatar = async (req, res) => {
 const updateCart = async (req, res) => {
     try {
         const { _id } = req.user
-        const { data } = req
+        const { pdId, variationOption, quantity } = req.body
 
-        const productDetail = await ProductDetail.findById(data.pdId)
+        const productDetailId = new mongoose.Types.ObjectId(pdId)
+        const variationOptionIds = variationOption.map(
+            (id) => new mongoose.Types.ObjectId(id)
+        )
+
+        const productDetail = await ProductDetail.findById(productDetailId)
         if (!productDetail)
             return responseData(res, 404, 1, 'Product detail not found')
 
@@ -313,20 +484,25 @@ const updateCart = async (req, res) => {
 
         const findProduct = user?.cart.find(
             (el) =>
-                el.productDetail.toString() === data.pdId &&
-                el.variationOption.toString() === data.variationOption
+                el.productDetail.toString() === productDetailId.toString() &&
+                Array.isArray(el.variationOption) &&
+                el.variationOption.length === variationOptionIds.length &&
+                el.variationOption.every(
+                    (val, index) =>
+                        val.toString() === variationOptionIds[index].toString()
+                )
         )
 
         if (findProduct) {
             await User.updateOne(
                 {
                     _id,
-                    'cart.productDetail': data.pdId,
-                    'cart.variationOption': data.variationOption,
+                    'cart.productDetail': productDetailId,
+                    'cart.variationOption': variationOptionIds,
                 },
                 {
                     $inc: {
-                        'cart.$.quantity': +data.quantity,
+                        'cart.$.quantity': +quantity,
                     },
                 }
             )
@@ -334,23 +510,17 @@ const updateCart = async (req, res) => {
             await User.findByIdAndUpdate(_id, {
                 $push: {
                     cart: {
-                        productDetail: data.pdId,
-                        quantity: +data.quantity,
-                        variationOption: data.variationOption,
+                        productDetail: productDetailId,
+                        quantity: +quantity,
+                        variationOption: variationOptionIds,
                     },
                 },
             })
         }
 
         const updatedUser = await User.aggregate([
-            {
-                $match: {
-                    _id: new mongoose.Types.ObjectId(_id),
-                },
-            },
-            {
-                $unwind: '$cart',
-            },
+            { $match: { _id: new mongoose.Types.ObjectId(_id) } },
+            { $unwind: '$cart' },
             {
                 $lookup: {
                     from: 'productdetails',
@@ -359,27 +529,48 @@ const updateCart = async (req, res) => {
                     as: 'cart.productDetail',
                 },
             },
-            {
-                $unwind: '$cart.productDetail',
-            },
+            { $unwind: '$cart.productDetail' },
+            { $unwind: '$cart.variationOption' },
             {
                 $lookup: {
                     from: 'variationoptions',
                     localField: 'cart.variationOption',
                     foreignField: '_id',
-                    as: 'cart.variationOption',
+                    as: 'variationOptionDetail',
                 },
             },
             {
-                $unwind: '$cart.variationOption',
+                $unwind: {
+                    path: '$variationOptionDetail',
+                    preserveNullAndEmptyArrays: true,
+                },
             },
             {
                 $group: {
-                    _id: '$_id',
-                    cart: { $push: '$cart' },
+                    _id: {
+                        cartId: '$cart._id',
+                        userId: '$_id',
+                    },
+                    productDetail: { $first: '$cart.productDetail' },
+                    quantity: { $first: '$cart.quantity' },
+                    variationOptions: { $push: '$variationOptionDetail' },
+                },
+            },
+            {
+                $group: {
+                    _id: '$_id.userId',
+                    cart: {
+                        $push: {
+                            _id: '$_id.cartId',
+                            productDetail: '$productDetail',
+                            quantity: '$quantity',
+                            variationOption: '$variationOptions',
+                        },
+                    },
                 },
             },
         ])
+        console.log('updatedUser: ', updatedUser)
 
         return responseData(
             res,
@@ -390,7 +581,8 @@ const updateCart = async (req, res) => {
             updatedUser[0]
         )
     } catch (error) {
-        responseData(res, 500, 1, error.message)
+        console.log('error: ', error)
+        return responseData(res, 500, 1, error.message)
     }
 }
 
@@ -400,21 +592,29 @@ const deleteItemCart = async (req, res) => {
         const { pdId, variationOption } = req.body
         const user = await User.findById(_id).select('cart')
         if (!user) return responseData(res, 404, 1, 'User not found')
+
         const findProduct = user.cart.find(
             (el) =>
                 el.productDetail.toString() === pdId &&
-                el.variationOption.toString() === variationOption
+                variationOption.every((opt) =>
+                    el.variationOption.some(
+                        (v) => v.toString() === opt._id.toString()
+                    )
+                )
         )
         if (!findProduct) return responseData(res, 404, 1, 'Cart empty')
+
         await User.updateOne(
             { _id },
             {
                 $pull: {
                     cart: {
                         productDetail: new mongoose.Types.ObjectId(pdId),
-                        variationOption: new mongoose.Types.ObjectId(
-                            variationOption
-                        ),
+                        variationOption: {
+                            $all: variationOption.map(
+                                (opt) => new mongoose.Types.ObjectId(opt._id)
+                            ),
+                        },
                     },
                 },
             },
@@ -423,6 +623,7 @@ const deleteItemCart = async (req, res) => {
 
         responseData(res, 200, 0, 'Delete product cart successfully')
     } catch (error) {
+        console.log('error: ', error)
         responseData(res, 500, 1, error.message)
     }
 }
@@ -445,7 +646,7 @@ const deleteAllItemCart = async (req, res) => {
                                 ),
                             },
                             variationOption: {
-                                $in: items.map(
+                                $all: items.map(
                                     (item) =>
                                         new mongoose.Types.ObjectId(
                                             item.variationOption

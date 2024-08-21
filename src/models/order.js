@@ -11,10 +11,12 @@ const OrderSchema = new mongoose.Schema(
                 quantity: {
                     type: Number,
                 },
-                variationOption: {
-                    type: mongoose.Types.ObjectId,
-                    ref: 'VariationOption',
-                },
+                variationOption: [
+                    {
+                        type: mongoose.Types.ObjectId,
+                        ref: 'VariationOption',
+                    },
+                ],
             },
         ],
         status: {

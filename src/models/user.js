@@ -49,10 +49,12 @@ const UserSchema = new mongoose.Schema(
                     ref: 'ProductDetail',
                 },
                 quantity: Number,
-                variationOption: {
-                    type: mongoose.Types.ObjectId,
-                    ref: 'VariationOption',
-                }
+                variationOption: [
+                    {
+                        type: mongoose.Types.ObjectId,
+                        ref: 'VariationOption',
+                    },
+                ],
             },
         ],
         address: {

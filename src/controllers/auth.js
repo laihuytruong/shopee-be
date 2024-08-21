@@ -65,7 +65,6 @@ const register = async (req, res) => {
         const accessToken = generateAccessToken(payload, '2d')
         const newRefreshToken = generateRefreshToken(user._id)
 
-        // Save refresh token to db
         await User.findByIdAndUpdate(
             user._id,
             { refreshToken: newRefreshToken },
@@ -77,9 +76,8 @@ const register = async (req, res) => {
             201,
             0,
             'Register successfully',
-            null,
-            response,
-            `Bearer ${accessToken}`
+            `Bearer ${accessToken}`,
+            response
         )
     } catch (error) {
         console.log(error)
@@ -106,18 +104,15 @@ const login = async (req, res) => {
             ...response
         } = user.toObject()
         const role = response.role.roleName
-        // Generate access token and refresh token
         const payload = { _id: user._id, role }
         const accessToken = generateAccessToken(payload, '2d')
         const newRefreshToken = generateRefreshToken(user._id)
-        // Save refresh token to db
         await User.findByIdAndUpdate(
             user._id,
             { refreshToken: newRefreshToken },
             { new: true }
         )
 
-        // Save refresh token to cookie
         res.cookie('refreshToken', newRefreshToken, {
             httpOnly: true,
             maxAge: 7 * 24 * 60 * 60 * 1000,
@@ -139,7 +134,6 @@ const generateNewToken = async (req, res) => {
     try {
         const { refreshToken } = req.cookies
 
-        // Check cookie and refreshToken
         if (!refreshToken) {
             return responseData(res, 401, 1, 'Unauthorized')
         }
@@ -152,7 +146,6 @@ const generateNewToken = async (req, res) => {
                     return responseData(res, 401, 1, err.message)
                 }
 
-                // Find user contain decode._id and cookie.refreshToken
                 const user = await User.findOne({
                     _id: decode._id,
                     refreshToken,
@@ -166,7 +159,6 @@ const generateNewToken = async (req, res) => {
                     )
                 }
 
-                // Create new access token
                 const newToken = generateAccessToken(
                     { _id: user._id, role: user.role },
                     '2d'
@@ -184,12 +176,10 @@ const logout = async (req, res) => {
     try {
         const { refreshToken } = req.cookies
 
-        // Check exist refreshToken
         if (!refreshToken) {
             return responseData(res, 401, 1, 'Not log in')
         }
 
-        // Delete refresh token on db
         await User.findOneAndUpdate(
             {
                 refreshToken,
@@ -198,7 +188,6 @@ const logout = async (req, res) => {
             { new: true }
         )
 
-        // Delete refresh token on cookie
         res.clearCookie('refreshToken', {
             httpOnly: true,
             secure: true,

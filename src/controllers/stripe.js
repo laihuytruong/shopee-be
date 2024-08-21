@@ -6,6 +6,7 @@ const createCheckoutSession = async (req, res) => {
     try {
         const { products } = req.body
         const { _id } = req.user
+        console.log('products', products)
 
         const order = new Order({
             products,
@@ -34,10 +35,35 @@ const createCheckoutSession = async (req, res) => {
         })
         responseData(res, 200, 0, '', null, { id: session.id })
     } catch (error) {
+        console.error('error: ', error)
         responseData(res, 500, 1, error.message)
+    }
+}
+
+const getTotalTransactionsAndAmount = async (req, res) => {
+    try {
+        const charges = await stripe.charges.list({
+            limit: 100,
+        })
+
+        const totalTransactions = charges.data.length
+        const totalAmount = charges.data.reduce((sum, charge) => {
+            return sum + charge.amount
+        }, 0)
+
+        console.log(`Total Transactions: ${totalTransactions}`)
+        console.log(
+            `Total Amount Sold: ${
+                totalAmount / 100
+            } ${charges.data[0].currency.toUpperCase()}`
+        )
+        return responseData(res, 200, 0, totalAmount)
+    } catch (error) {
+        console.error('Error retrieving transactions and amount:', error)
     }
 }
 
 module.exports = {
     createCheckoutSession,
+    getTotalTransactionsAndAmount,
 }
