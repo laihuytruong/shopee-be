@@ -235,7 +235,6 @@ const resetPassword = async (req, res) => {
             .createHash('sha256')
             .update(token)
             .digest('hex')
-        console.log('passwordResetToken: ', passwordResetToken)
         const user = await User.findOne({
             passwordResetToken,
             passwordResetExpires: { $gt: Date.now() },

@@ -6,7 +6,6 @@ const createCheckoutSession = async (req, res) => {
     try {
         const { products } = req.body
         const { _id } = req.user
-        console.log('products', products)
 
         const order = new Order({
             products,
@@ -50,14 +49,7 @@ const getTotalTransactionsAndAmount = async (req, res) => {
         const totalAmount = charges.data.reduce((sum, charge) => {
             return sum + charge.amount
         }, 0)
-
-        console.log(`Total Transactions: ${totalTransactions}`)
-        console.log(
-            `Total Amount Sold: ${
-                totalAmount / 100
-            } ${charges.data[0].currency.toUpperCase()}`
-        )
-        return responseData(res, 200, 0, totalAmount)
+        responseData(res, 200, 0, totalAmount)
     } catch (error) {
         console.error('Error retrieving transactions and amount:', error)
     }

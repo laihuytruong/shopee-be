@@ -570,7 +570,6 @@ const updateCart = async (req, res) => {
                 },
             },
         ])
-        console.log('updatedUser: ', updatedUser)
 
         return responseData(
             res,
@@ -633,30 +632,27 @@ const deleteAllItemCart = async (req, res) => {
         const { _id } = req.user
         const { items, checkAll } = req.body
 
-        if (!checkAll && items !== null) {
-            await User.updateOne(
-                { _id },
-                {
-                    $pull: {
-                        cart: {
-                            productDetail: {
-                                $in: items.map(
-                                    (item) =>
-                                        new mongoose.Types.ObjectId(item.pdId)
+        if (!checkAll && items && items.length > 0) {
+            for (const item of items) {
+                await User.updateOne(
+                    { _id },
+                    {
+                        $pull: {
+                            cart: {
+                                productDetail: new mongoose.Types.ObjectId(
+                                    item.pdId
                                 ),
-                            },
-                            variationOption: {
-                                $all: items.map(
-                                    (item) =>
-                                        new mongoose.Types.ObjectId(
-                                            item.variationOption
-                                        )
-                                ),
+                                variationOption: {
+                                    $all: item.variationOption.map(
+                                        (opt) =>
+                                            new mongoose.Types.ObjectId(opt)
+                                    ),
+                                },
                             },
                         },
-                    },
-                }
-            )
+                    }
+                )
+            }
         } else {
             await User.updateOne(
                 { _id },

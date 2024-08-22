@@ -32,7 +32,6 @@ const sendEmail = async ({ email, template, subject, context }) => {
         context,
     })
 
-    console.log('Message sent: %s', info.messageId)
     return info
 }
 

@@ -170,7 +170,6 @@ const createCategoryItem = async (req, res) => {
             slug: generateSlug(categoryItemName),
             category,
         })
-        console.log(response)
         if (!response) {
             return responseData(res, 400, 1, 'Create category item failed')
         }

@@ -163,7 +163,6 @@ const getProductById = async (req, res) => {
 const getProductBySlug = async (req, res) => {
     try {
         const { slug } = req.params
-        console.log('req.params: ', req.params)
         const pipeline = [
             {
                 $match: {

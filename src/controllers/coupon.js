@@ -37,7 +37,6 @@ const createCoupon = async (req, res) => {
             discount: +data.discount,
             expireDate: moment(data.expireDate, 'DD/MM/YYYY').toDate(),
         })
-        console.log(response)
         if (!response) return responseData(res, 400, 1, 'Create coupon failed')
         responseData(res, 201, 0, 'Create coupon successfully', null, response)
     } catch (error) {

@@ -754,7 +754,6 @@ const filter = async (req, res) => {
         if (minDate && maxDate) {
             const min = new Date(minDate)
             const max = new Date(maxDate)
-            console.log('min: ', min)
             if (isNaN(min.getTime()) || isNaN(max.getTime())) {
                 return responseData(res, 400, 1, 'Invalid date format')
             }
